@@ -36,9 +36,9 @@ get_latest_file() {
   remote_path=$1
   local_path=$2
   if has "curl"; then
-    curl -sL $PEERTUBE_DOCKER_RAW_URL$remote_path > $local_path
+    curl -sSL $PEERTUBE_DOCKER_RAW_URL$remote_path > $local_path
   elif has "wget"; then
-    wget -q $PEERTUBE_DOCKER_RAW_URL$remote_path -O $local_path
+    wget -nv $PEERTUBE_DOCKER_RAW_URL$remote_path -O $local_path
   fi
 }
 
@@ -47,9 +47,9 @@ get_docker_compose() {
   release=$1
   download_url="https://github.com/docker/compose/releases/download/$release/docker-compose-`uname -s`-`uname -m`"
   if has "curl"; then
-    curl -sL $download_url -o /usr/local/bin/docker-compose
+    curl -sSL $download_url -o /usr/local/bin/docker-compose
   elif has "wget"; then
-    wget -q $download_url -O /usr/local/bin/docker-compose
+    wget -nv $download_url -O /usr/local/bin/docker-compose
   fi
   chmod +x /usr/local/bin/docker-compose
 }
@@ -59,7 +59,7 @@ get_latest_release_name() {
   repo=$1
   api_url="https://api.github.com/repos/$repo/releases/latest"
   if has "curl"; then
-    curl -s $api_url |
+    curl -sL $api_url |
       grep '"tag_name":' |         # Get tag line
       sed -E 's/.*"([^"]+)".*/\1/' # Pluck JSON value
   elif has "wget"; then
@@ -173,6 +173,7 @@ if [ -f "$SERVICE_PATCH" ]; then
 fi
 
 # Install or upgrade docker-compose
+echo >&2 "Check latest release of Compose on GitHub Releases"
 compose_latest_release=`get_latest_release_name "docker/compose"`
 if ! has "$COMPOSE"; then
   echo >&2 "Install Docker Compose $compose_latest_release"
@@ -199,11 +200,8 @@ echo >&2 "Create docker-volume/traefik/acme.json if non-exists"
 touch docker-volume/traefik/acme.json
 chmod 600 docker-volume/traefik/acme.json
 
-# If .env does not exist get the lastest one
-if [ -f  ./.env ]; then
-  echo >&2 "Keep existing .env"
-else
-  # Copy .env
+# Copy .env
+if [ ! -f  ./.env ]; then
   echo >&2 "Get latest environment variables .env"
   get_latest_file "/.env" ".env"
 
@@ -216,21 +214,93 @@ else
   if [ ! -z $MY_DOMAIN ]; then
     sed -i -e "s/<MY DOMAIN>/$MY_DOMAIN/g" .env
   fi
-  # Randomize postgres username
+
+  # Randomize postgres username and password
   MY_POSTGRES_USERNAME="`head /dev/urandom | tr -dc A-Za-z0-9 | head -c 10`"
-  sed -i -e "s/<MY POSTGRES USERNAME>/$MY_POSTGRES_USERNAME/g" .env
-  # Randomize postgres password
   MY_POSTGRES_PASSWORD=`date +%s | sha256sum | base64 | head -c 32`
+
+  # Replace them in .env
+  sed -i -e "s/<MY POSTGRES USERNAME>/$MY_POSTGRES_USERNAME/g" .env
   sed -i -e "s/<MY POSTGRES PASSWORD>/$MY_POSTGRES_PASSWORD/g" .env
+else
+  if [ "$LOCK_COMPOSE_SETUP" = true ] || [ "$LOCK_COMPOSE_ENV" = true ]; then
+    echo >&2 "Keep existing environment variables .env"
+  else
+    echo >&2 "Get latest environment variables .env"
+    get_latest_file "/.env" ".env.new"
+
+    # Make sure new .env is well downloaded with patterns to replace
+    if [ ! -f ./.env.new ]; then
+      echo >&2 "ERROR: Latest .env is missing"
+      exit 1
+    fi
+
+    # Make sure to find all patterns in new .env
+    missing_patterns=0
+    if [ -z "`grep -E -o "<MY EMAIL ADDRESS>" .env.new`" ]; then
+      missing_patterns=1
+      echo >&2 "ERROR: Pattern <MY EMAIL ADDRESS> is missing in latest .env"
+    fi
+    if [ -z "`grep -E -o "<MY DOMAIN>" .env.new`" ]; then
+      missing_patterns=1
+      echo >&2 "ERROR: Pattern <MY DOMAIN> is missing in latest .env"
+    fi
+    if [ -z "`grep -E -o "<MY POSTGRES USERNAME>" .env.new`" ]; then
+      missing_patterns=1
+      echo >&2 "ERROR: Pattern <MY POSTGRES USERNAME> is missing in latest .env"
+    fi
+    if [ -z "`grep -E -o "<MY POSTGRES PASSWORD>" .env.new`" ]; then
+      missing_patterns=1
+      echo >&2 "ERROR: Pattern <MY POSTGRES PASSWORD> is missing in latest .env"
+    fi
+
+    # Exit script if at least one pattern is missing
+    if [ "$missing_patterns" -ne 0 ]; then exit 1; fi
+
+    # Automatic filling new .env
+    # Replace .env variables with MY_EMAIL_ADDRESS, MY_DOMAIN, MY_POSTGRES_USERNAME and MY_POSTGRES_PASSWORD
+    sed -i -e "s/<MY POSTGRES DB>/peertube/g" .env.new
+    if [ ! -z $MY_EMAIL_ADDRESS ]; then
+      sed -i -e "s/<MY EMAIL ADDRESS>/$MY_EMAIL_ADDRESS/g" .env.new
+    fi
+    if [ ! -z $MY_DOMAIN ]; then
+      sed -i -e "s/<MY DOMAIN>/$MY_DOMAIN/g" .env.new
+    fi
+
+    # Get postgres username and password from existing PEERTUBE_DB_USERNAME and PEERTUBE_DB_PASSWORD in .env
+    MY_POSTGRES_USERNAME="`grep -E -o "PEERTUBE_DB_USERNAME=.*" ./.env | sed -E "s/PEERTUBE_DB_USERNAME=//g"`"
+    MY_POSTGRES_PASSWORD="`grep -E -o "PEERTUBE_DB_PASSWORD=.*" ./.env | sed -E "s/PEERTUBE_DB_PASSWORD=//g"`"
+
+    # If credentials not found exit script
+    if [ -z "$MY_POSTGRES_USERNAME" ] || [ -z "$MY_POSTGRES_PASSWORD" ]; then
+      echo >&2 "ERROR: PostgreSQL credentials are missing in current .env"
+      exit 1
+    fi
+
+    # Replace them in new .env
+    sed -i -e "s/<MY POSTGRES USERNAME>/$MY_POSTGRES_USERNAME/g" .env.new
+    sed -i -e "s/<MY POSTGRES PASSWORD>/$MY_POSTGRES_PASSWORD/g" .env.new
+
+    # Now everything is ok, overwrite old .env with the new one
+    mv .env.new .env
+  fi
 fi
 
-# Copy traefik config
-echo >&2 "Get latest reverse proxy docker-volume/traefik/traefik.toml"
-get_latest_file "/config/traefik.toml" "docker-volume/traefik/traefik.toml"
+# Copy traefik.toml
+if [ ! -f ./docker-volume/traefik/traefik.toml ] || [ ! "$LOCK_COMPOSE_SETUP" ] && [ ! "$LOCK_TRAEFIK_CONFIG" ]; then
+  echo >&2 "Get latest reverse-proxy config docker-volume/traefik/traefik.toml"
+  get_latest_file "/config/traefik.toml" "docker-volume/traefik/traefik.toml"
+else
+  echo >&2 "Keep existing reverse-proxy config docker-volume/traefik/traefik.toml"
+fi
 
-# Copy docker-compose
-echo >&2 "Get latest docker-compose.yml"
-get_latest_file "/docker-compose.yml" "docker-compose.yml"
+# Copy docker-compose.yml
+if [ ! -f ./docker-compose.yml ] || [ ! "$LOCK_COMPOSE_SETUP" ] && [ ! "$LOCK_COMPOSE_FILE" ]; then
+  echo >&2 "Get latest docker-compose.yml"
+  get_latest_file "/docker-compose.yml" "docker-compose.yml"
+else
+  echo >&2 "Keep existing docker-compose.yml"
+fi
 
 # chown on workdir
 echo >&2 "Set non-root system user as owner of workdir (chown -R docker:docker $WORKDIR)"
@@ -262,21 +332,19 @@ ExecStop=$COMPOSE down
 WantedBy=multi-user.target
 EOT
 
-# If admin email and domain are not defined as parameters edit .env
-if [ -z $MY_EMAIL_ADDRESS ]; then
-  if [ -z $MY_DOMAIN ]; then
-    echo >&2 "Edit .env ..."
-    sleep 1
+# If MY_EMAIL_ADDRESS and MY_DOMAIN are not defined edit .env
+if [ -z $MY_EMAIL_ADDRESS ] || [ -z $MY_DOMAIN ]; then
+  echo >&2 "Edit .env ..."
+  sleep 1
 
-    if has "nano"; then
-      exec nano < /dev/tty "$@" ./.env & wait
-    elif has "vim"; then
-      exec vim < /dev/tty "$@" ./.env & wait
-    elif has "vi"; then
-      exec vi < /dev/tty "$@" ./.env & wait
-    else
-      echo >&2 "- missing command-line editor nano, vim or vi"
-    fi
+  if has "nano"; then
+    exec nano < /dev/tty "$@" ./.env & wait
+  elif has "vim"; then
+    exec vim < /dev/tty "$@" ./.env & wait
+  elif has "vi"; then
+    exec vi < /dev/tty "$@" ./.env & wait
+  else
+    echo >&2 "- missing command-line editor nano, vim or vi"
   fi
 fi
 
@@ -294,11 +362,13 @@ systemctl start --no-block peertube # be sure start process does not block stdou
 
 # Block stdout until server is up
 echo >&2 "Wait until PeerTube server is up..."
-sleep 12s &
+
+sleep 20s &
 while [ -z "`$COMPOSE logs --tail=2 peertube | grep -o 'Server listening on'`" ]; do
-  # Break after 12s / until pid of "sleep 12s" is destroyed
+  # Break after 20s / until pid of "sleep 20s" is destroyed
   # Display journalctl error logs and exit
-  if [ -z "`ps -ef | grep $! | grep -o -E 'sleep 12s'`" ]; then
+  if [ -z "`ps -ef | grep $! | grep -o -E 'sleep 20s'`" ]; then
+    # Display peertube errors from journalctl or if service start has failed run compose up to display explicit compose errors
     journalctl -q -e -u peertube | grep -i "error" || [ "`systemctl is-active peertube`" = "failed" ] && $COMPOSE up
     exit 1
   fi
@@ -306,6 +376,7 @@ done
 
 # if compose log file is not created display journalctl error logs and exit
 if [ ! -f docker-volume/data/logs/peertube.log ]; then
+  # Display peertube errors from journalctl or if service start has failed run compose up to display explicit compose errors
   journalctl -q -e -u peertube | grep -i "error" || [ "`systemctl is-active peertube`" = "failed" ] && $COMPOSE up
   exit 1
 fi
