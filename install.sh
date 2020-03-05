@@ -299,14 +299,14 @@ while [ -z "`$COMPOSE logs --tail=2 peertube | grep -o 'Server listening on'`" ]
   # Break after 12s / until pid of "sleep 12s" is destroyed
   # Display journalctl error logs and exit
   if [ -z "`ps -ef | grep $! | grep -o -E 'sleep 12s'`" ]; then
-    journalctl -q -e -u peertube | grep "error"
+    journalctl -q -e -u peertube | grep -i "error" || [ "`systemctl is-active peertube`" = "failed" ] && $COMPOSE up
     exit 1
   fi
 done
 
 # if compose log file is not created display journalctl error logs and exit
 if [ ! -f docker-volume/data/logs/peertube.log ]; then
-  journalctl -q -e -u peertube | grep "error"
+  journalctl -q -e -u peertube | grep -i "error" || [ "`systemctl is-active peertube`" = "failed" ] && $COMPOSE up
   exit 1
 fi
 
