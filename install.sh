@@ -369,45 +369,63 @@ $COMPOSE >&2 pull
 systemctl >/dev/null 2>&1 dameon-reload # redirect out possible errors
 systemctl >&2 enable peertube
 
-# Start service
+# Run one time before starting service
 echo >&2 "Start PeerTube service"
-systemctl start --no-block peertube # be sure start process does not block stdout
+
+# Run compose detached and exit if any errors
+compose_errors=`$($COMPOSE up -d) | grep -i 'ERROR'`
+if [ ! -z "$compose_errors" ]; then
+  exit 1
+fi
 
 # Block stdout until server is up
 echo >&2 "Wait until PeerTube server is up..."
-
-sleep 10s &
-while [ -z "`$COMPOSE logs --tail=2 peertube | grep -o 'info:'`" ]; do
-  # Break after 10s / until pid of "sleep 10s" is destroyed
-  # Display journalctl error logs and exit
-  if [ -z "`ps -ef | grep $! | grep -o -E 'sleep 10s'`" ]; then
-    # Display peertube errors from journalctl or if service start has failed run compose up to display explicit compose errors
-    journalctl -q -e -u peertube | grep -i "error" || [ "`systemctl is-active peertube`" = "failed" ] && $COMPOSE up
-    exit 1
-  fi
-done
-
-sleep 20s &
+sleep 50s &
 while [ -z "`$COMPOSE logs --tail=2 peertube | grep -o 'Server listening on'`" ]; do
-  # Break after 20s / until pid of "sleep 20s" is destroyed
-  # Display journalctl error logs and exit
-  if [ -z "`ps -ef | grep $! | grep -o -E 'sleep 20s'`" ]; then
-    # Display peertube errors from journalctl or if service start has failed run compose up to display explicit compose errors
-    journalctl -q -e -u peertube | grep -i "error" || [ "`systemctl is-active peertube`" = "failed" ] && $COMPOSE up
+  # Break if any stack errors occur
+  # Displays errors and exit
+  stack_errors=`$COMPOSE logs --tail=40 peertube | grep -i 'error'`
+  if [ ! -z "$stack_errors" ]; then
+    echo >&2 $stack_errors
+    exit 1
+  fi
+  # Break after 50s / until pid of "sleep 50s" is destroyed
+  # Display logs and exit
+  if [ -z "`ps -ef | grep $! | grep -o -E 'sleep 50s'`" ]; then
+    $COMPOSE logs --tail=40 peertube
     exit 1
   fi
 done
+echo >&2 "PeerTube server is successfully up"
 
-# if compose log file is not created display journalctl error logs and exit
-if [ ! -f docker-volume/data/logs/peertube.log ]; then
-  # Display peertube errors from journalctl or if service start has failed run compose up to display explicit compose errors
-  journalctl -q -e -u peertube | grep -i "error" || [ "`systemctl is-active peertube`" = "failed" ] && $COMPOSE up
-  exit 1
-fi
+# Start service
+systemctl start --no-block peertube # be sure start process does not block stdout
 
 # Display Admin Credentials
 echo >&2 ""
 echo >&2 "> PeerTube Admin Credentials <"
-echo >&2 `cat docker-volume/data/logs/peertube.log | grep -A1 -E -o "Username: [0-9a-zAZ-Z]*"`
-echo >&2 `cat docker-volume/data/logs/peertube.log | grep -A1 -E -o "User password: [0-9a-zAZ-Z]*"`
+username=`$COMPOSE logs peertube | grep -A1 -E -o "Username: [0-9a-zAZ-Z]*"`
+password=`$COMPOSE logs peertube | grep -A1 -E -o "User password: [0-9a-zAZ-Z]*"`
+
+if [ ! -z "$username" ] && [ ! -z "$password" ]; then
+  echo >&2 $username
+  echo >&2 $password
+# If credentials are not found in compose logs
+else
+  if [ ! -f docker-volume/data/logs/peertube.log ]; then
+    echo >&2 "ERROR: Can't display Admin Credentials, missing docker-volume/data/logs/peertube.log"
+    exit 1
+  else
+    username=`cat docker-volume/data/logs/peertube.log | grep -A1 -E -o "Username: [0-9a-zAZ-Z]*"`
+    password=`cat docker-volume/data/logs/peertube.log | grep -A1 -E -o "User password: [0-9a-zAZ-Z]*"`
+
+    if [ ! -z "$username" ] && [ ! -z "$password" ]; then
+      echo >&2 $username
+      echo >&2 $password
+    else
+      echo >&2 "ERROR: Missing Admin Credentials in logs"
+      exit 1
+    fi
+  fi
+fi
 }
