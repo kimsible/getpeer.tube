@@ -2,15 +2,14 @@
 
 **Installing** and **upgrading** of the [PeerTube](https://joinpeertube.org) stack with one SHELL command.
 
-This script is based on [the official docker production setup](https://docs.joinpeertube.org/#/install-docker) and runs on most GNU linux distributions.
+This script is based on [the official docker production setup](https://docs.joinpeertube.org/#/install-docker) and runs on most x86-64 linux distributions.
 
 ### Server requirements
 
-- GNU linux distribution upgraded
+- x86-64 Linux Distribution updated
 - SSH access **as root** or sudoer user with `sudo` prefix
 - Access on **ports 25 (smtp)**, **80 (http)** and **443 (https)**
 - **[Docker](https://docs.docker.com/install/) >= v17.06**
-- _docker-compose installed for ARM architecture_
 
 ## Usage
 
