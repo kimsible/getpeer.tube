@@ -172,17 +172,30 @@ if [ -f "$SERVICE_PATCH" ]; then
   fi
 fi
 
-# Install or upgrade docker-compose
-echo >&2 "Check latest release of Compose on GitHub Releases"
-compose_latest_release=`get_latest_release_name "docker/compose"`
-if ! has "$COMPOSE"; then
-  echo >&2 "Install Docker Compose $compose_latest_release"
-  get_docker_compose "$compose_latest_release"
+# Other architectures than x86_64
+if [ -z "`uname -a | grep -o "x86_64"`" ]; then
+  echo >&2 "Compose Binary can't be installed on your architecture"
+  COMPOSE="docker-compose"
+  if ! has "$COMPOSE"; then
+    echo >&2 "Unfortunately docker-compose is not installed on your system"
+    exit 1
+  else
+    compose_current_release=`get_current_release "$COMPOSE -v"`
+    echo >&2 "Using system docker-compose, found version $compose_current_release"
+  fi
 else
-  compose_current_release=`get_current_release "$COMPOSE -v"`
-  if ! is_update "$compose_current_release" "$compose_latest_release"; then
-    echo >&2 "Upgrade Docker Compose from "$compose_current_release" to $compose_latest_release"
+  # Install or upgrade docker-compose
+  echo >&2 "Check latest release of Compose on GitHub Releases"
+  compose_latest_release=`get_latest_release_name "docker/compose"`
+  if ! has "$COMPOSE"; then
+    echo >&2 "Install Docker Compose $compose_latest_release"
     get_docker_compose "$compose_latest_release"
+  else
+    compose_current_release=`get_current_release "$COMPOSE -v"`
+    if ! is_update "$compose_current_release" "$compose_latest_release"; then
+      echo >&2 "Upgrade Docker Compose from "$compose_current_release" to $compose_latest_release"
+      get_docker_compose "$compose_latest_release"
+    fi
   fi
 fi
 
@@ -362,6 +375,17 @@ systemctl start --no-block peertube # be sure start process does not block stdou
 
 # Block stdout until server is up
 echo >&2 "Wait until PeerTube server is up..."
+
+sleep 10s &
+while [ -z "`$COMPOSE logs --tail=2 peertube | grep -o 'info:'`" ]; do
+  # Break after 10s / until pid of "sleep 10s" is destroyed
+  # Display journalctl error logs and exit
+  if [ -z "`ps -ef | grep $! | grep -o -E 'sleep 10s'`" ]; then
+    # Display peertube errors from journalctl or if service start has failed run compose up to display explicit compose errors
+    journalctl -q -e -u peertube | grep -i "error" || [ "`systemctl is-active peertube`" = "failed" ] && $COMPOSE up
+    exit 1
+  fi
+done
 
 sleep 20s &
 while [ -z "`$COMPOSE logs --tail=2 peertube | grep -o 'Server listening on'`" ]; do

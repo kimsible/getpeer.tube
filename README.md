@@ -6,10 +6,11 @@ This script is based on [the official docker production setup](https://docs.join
 
 ### Server requirements
 
-- GNU linux distribution
+- GNU linux distribution upgraded
 - SSH access **as root** or sudoer user with `sudo` prefix
 - Access on **ports 25 (smtp)**, **80 (http)** and **443 (https)**
 - **[Docker](https://docs.docker.com/install/) >= v17.06**
+- _docker-compose installed for ARM architecture_
 
 ## Usage
 
