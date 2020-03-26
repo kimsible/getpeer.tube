@@ -6,7 +6,8 @@
 #################
 
 # Peertube: https raw url of docker production PeerTube setup
-PEERTUBE_DOCKER_RAW_URL=https://raw.githubusercontent.com/chocobozzz/PeerTube/develop/support/docker/production
+# TODO : replace rigelk/PeerTube/traefik-to-nginx once nginx docker is implemented to chocobozzz/PeerTube/master branch
+PEERTUBE_DOCKER_RAW_URL=https://raw.githubusercontent.com/rigelk/PeerTube/traefik-to-nginx/support
 
 # Docker: needs version matching with v3.3 Compose file format
 # https://docs.docker.com/compose/compose-file/compose-versioning/
@@ -269,10 +270,14 @@ echo >&2 "Create docker-volume/traefik/acme.json if non-exists"
 touch docker-volume/traefik/acme.json
 chmod 600 docker-volume/traefik/acme.json
 
+# Init nginx directory
+echo >&2 "Create docker-volume/nginx if non-exists"
+mkdir -p docker-volume/nginx
+
 # Copy .env
 if [ ! -f  ./.env ]; then
   echo >&2 "Get latest environment variables .env"
-  get_latest_file "/.env" ".env"
+  get_latest_file "/docker/production/.env" ".env"
 
   # Automatic filling .env
   # Replace .env variables with MY_EMAIL_ADDRESS, MY_DOMAIN, MY_POSTGRES_USERNAME and MY_POSTGRES_PASSWORD
@@ -296,7 +301,7 @@ else
     echo >&2 "Keep existing environment variables .env"
   else
     echo >&2 "Get latest environment variables .env"
-    get_latest_file "/.env" ".env.new"
+    get_latest_file "/docker/production/.env" ".env.new"
 
     # Make sure new .env is well downloaded with patterns to replace
     if [ ! -f ./.env.new ]; then
@@ -358,18 +363,38 @@ fi
 # Copy traefik.toml
 if [ ! -f ./docker-volume/traefik/traefik.toml ] || [ ! "$LOCK_COMPOSE_SETUP" ] && [ ! "$LOCK_TRAEFIK_CONFIG" ]; then
   echo >&2 "Get latest reverse-proxy config docker-volume/traefik/traefik.toml"
-  get_latest_file "/config/traefik.toml" "docker-volume/traefik/traefik.toml"
+  get_latest_file "/docker/production/config/traefik.toml" "docker-volume/traefik/traefik.toml"
 else
   echo >&2 "Keep existing reverse-proxy config docker-volume/traefik/traefik.toml"
+fi
+
+# Copy nginx config
+if [ ! -f ./docker-volume/nginx/peertube ] || [ ! "$LOCK_COMPOSE_SETUP" ] && [ ! "$LOCK_NGINX_CONFIG" ]; then
+  echo >&2 "Get latest nginx config docker-volume/nginx/peertube"
+  get_latest_file "/nginx/peertube" "docker-volume/nginx/peertube"
+else
+  echo >&2 "Keep existing nginx config docker-volume/nginx/peertube"
+fi
+
+# Copy nginx image
+if [ ! -f ./docker-volume/Dockerfile.nginx ] && [ ! -f ./docker-volume/entrypoint.nginx.sh ] || [ ! "$LOCK_COMPOSE_SETUP" ] && [ ! "$LOCK_NGINX_IMAGE" ]; then
+  echo >&2 "Get latest nginx image 'Dockerfile.nginx' and 'entrypoint.nginx.sh' files"
+  get_latest_file "/docker/production/Dockerfile.nginx" "Dockerfile.nginx"
+  get_latest_file "/docker/production/entrypoint.nginx.sh" "entrypoint.nginx.sh"
+else
+  echo >&2 "Keep existing nginx image 'Dockerfile.nginx' and 'entrypoint.nginx.sh' files"
 fi
 
 # Copy docker-compose.yml
 if [ ! -f ./docker-compose.yml ] || [ ! "$LOCK_COMPOSE_SETUP" ] && [ ! "$LOCK_COMPOSE_FILE" ]; then
   echo >&2 "Get latest docker-compose.yml"
-  get_latest_file "/docker-compose.yml" "docker-compose.yml"
+  get_latest_file "/docker/production/docker-compose.yml" "docker-compose.yml"
 else
   echo >&2 "Keep existing docker-compose.yml"
 fi
+
+# TODO : remove once nginx docker is implemented to chocobozzz/PeerTube master branch
+sed -i -e "s/source: \.\.\/\.\.\/nginx\/peertube/source: \.\/docker-volume\/nginx\/peertube/g" "docker-compose.yml"
 
 # chown on workdir
 echo >&2 "Set non-root system user as owner of workdir (chown -R docker:docker $WORKDIR)"
