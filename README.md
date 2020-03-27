@@ -64,7 +64,8 @@ You can also download and run [the script](https://raw.github.com/kimsible/insta
 - Create or update `peertube.service`
 - Pull latest images
 - Run `peertube.service`
-- Display **Admin PeerTube Credentials** once server up or error logs
+- Display **PeerTube Admin Credentials** once server up or error logs
+- Display **PeerTube DKIM DNS TXT Record** to configure into your Domain Name System zone
 
 ## Known issues
 

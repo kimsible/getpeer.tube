@@ -484,3 +484,8 @@ else
   fi
 fi
 }
+
+# Display DKIM DNS TXT Record
+echo >&2 ""
+echo >&2 "> PeerTube DKIM DNS TXT Record <"
+cat ./docker-volume/opendkim/keys/*/*.txt
