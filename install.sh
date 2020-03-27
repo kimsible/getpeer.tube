@@ -419,7 +419,7 @@ if [ -f ./docker-volume/pgdump ]; then
   echo >&2 "${GREEN}done${NC}"
   # Run restore command
   echo >&2 -n "Restore existing dump ... "
-  $COMPOSE exec -T $PEERTUBE_DB_HOSTNAME psql -q -U $POSTGRES_USER < ./docker-volume/pgdump
+  $COMPOSE > /dev/null 2>&1 exec -T $PEERTUBE_DB_HOSTNAME psql -q -U $POSTGRES_USER < ./docker-volume/pgdump
   echo >&2 "${GREEN}done${NC}"
   rm -f ./docker-volume/pgdump
 fi
