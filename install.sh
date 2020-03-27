@@ -21,6 +21,10 @@ WORKDIR=/var/peertube
 # PeerTube Service Path
 SERVICE_PATH=/etc/systemd/system/peertube.service
 
+# Colors
+GREEN='\033[0;32m'
+RED='\033[0;31m'
+NC='\033[0m' # No Color
 
 #################
 ### FUNCTIONS ###
@@ -122,38 +126,38 @@ missing_prerequisites=0
 uid=`id -u`
 if [ "$uid" -ne 0 ]; then
   missing_prerequisites=1
-  echo >&2 "- this script must be run as root or as a sudoer user with sudo"
+  echo >&2 "- ${RED}ERROR${NC}: this script must be run as root or as a sudoer user with sudo"
 else
-  echo >&2 "- root OK"
+  echo >&2 "- root ${GREEN}OK${NC}"
 fi
 
 # systemd
 if ! has "systemctl"; then
   missing_prerequisites=1
-  echo >&2 "- systemd is missing"
+  echo >&2 "- ${RED}ERROR${NC}:systemd is missing"
 else
-  echo >&2 "- systemd OK"
+  echo >&2 "- systemd ${GREEN}OK${NC}"
 fi
 
 # curl or wget
 if ! has "curl" && ! has "wget"; then
   missing_prerequisites=1
-  echo >&2 "- curl or wget are required, both are missing"
+  echo >&2 "- ${RED}ERROR${NC}: curl or wget are required, both are missing"
 else
-  echo >&2 "- curl / wget OK"
+  echo >&2 "- curl / wget ${GREEN}OK${NC}"
 fi
 
 # docker
 if ! has "docker"; then
   missing_prerequisites=1
-  echo >&2 "- docker >= $DOCKER_PREREQUISITE_VERSION_NUMBER is missing"
+  echo >&2 "- ${RED}ERROR${NC}: docker >= $DOCKER_PREREQUISITE_VERSION_NUMBER is missing"
 else
   docker_current_release=`get_current_release "docker -v"`
   if ! check_prerequisite_version "$docker_current_release" "$DOCKER_PREREQUISITE_VERSION_NUMBER"; then
     missing_prerequisites=1
-    echo >&2 "- docker >= $DOCKER_PREREQUISITE_VERSION_NUMBER is required, found $docker_current_release"
+    echo >&2 "- ${RED}ERROR${NC}: docker >= $DOCKER_PREREQUISITE_VERSION_NUMBER is required, found $docker_current_release"
   else
-    echo >&2 "- docker OK"
+    echo >&2 "- docker ${GREEN}OK${NC}"
   fi
 fi
 
@@ -193,7 +197,7 @@ fi
 
 # Init workdir
 echo >&2 "Create workdir $WORKDIR if non-exists"
-mkdir -p "$WORKDIR"
+mkdir -p "$WORKDIR/docker-volume"
 cd "$WORKDIR"
 
 # Stop active peertube systemd service and dump database to not conflict upgrade
@@ -203,8 +207,11 @@ if [ "`systemctl is-active peertube`"="active" ]; then
   # Get postgres service name
   PEERTUBE_DB_HOSTNAME="`grep -E -o "PEERTUBE_DB_HOSTNAME=(.+)" .env | sed -E "s/PEERTUBE_DB_HOSTNAME=//g"`"
   # Run dump command
-  echo >&2 "Dump existing database..."
-  $COMPOSE exec -T $PEERTUBE_DB_HOSTNAME pg_dumpall -U $POSTGRES_USER > ./docker-volume/pgdump
+  if [ ! -z "$($COMPOSE ps -q $PEERTUBE_DB_HOSTNAME)" ]; then
+    echo >&2 -n "Dump existing database ... "
+    $COMPOSE exec -T $PEERTUBE_DB_HOSTNAME pg_dumpall -U $POSTGRES_USER > ./docker-volume/pgdump
+    echo >&2 "${GREEN}done${NC}"
+  fi
   # Stop systemd service
   echo >&2 "Stop existing PeerTube service to not conflict upgrade"
   systemctl >&2 stop peertube
@@ -353,22 +360,26 @@ EOT
 
 # If MY_EMAIL_ADDRESS and MY_DOMAIN are not defined edit .env
 if [ -z $MY_EMAIL_ADDRESS ] || [ -z $MY_DOMAIN ]; then
-  echo >&2 "Edit .env ..."
+  echo >&2 -n "Edit .env ..."
   sleep 1
 
   if has "nano"; then
     exec nano < /dev/tty "$@" ./.env & wait
+    echo >&2 "${GREEN}done${NC}"
   elif has "vim"; then
     exec vim < /dev/tty "$@" ./.env & wait
+    echo >&2 "${GREEN}done${NC}"
   elif has "vi"; then
     exec vi < /dev/tty "$@" ./.env & wait
+    echo >&2 "${GREEN}done${NC}"
   else
+    echo >&2 "${RED}error${NC}"
     echo >&2 "- missing command-line editor nano, vim or vi"
   fi
 fi
 
 # Pull docker containers
-echo >&2 "Pull Docker containers..."
+echo >&2 "Pull Docker containers"
 $COMPOSE >&2 pull
 
 # Enable peertube systemd service
@@ -385,28 +396,32 @@ if [ -f ./docker-volume/pgdump ]; then
   PEERTUBE_DB_HOSTNAME="`grep -E -o "PEERTUBE_DB_HOSTNAME=(.+)" .env | sed -E "s/PEERTUBE_DB_HOSTNAME=//g"`"
   # Remove db files
   rm -rf ./docker-volume/db
+  sleep 1s
   # Re-start postgres service
   $COMPOSE up -d $PEERTUBE_DB_HOSTNAME
-  echo >&2 "Wait until PosgreSQL database is up..."
+  echo >&2 -n "Wait until PosgreSQL database is up ... "
   sleep 10s &
   while [ -z "`$COMPOSE logs --tail=2 $PEERTUBE_DB_HOSTNAME | grep -o 'database system is ready to accept connections'`" ]; do
     # Break if any database errors occur
     # Displays errors and exit
     db_errors=`$COMPOSE logs --tail=40 $PEERTUBE_DB_HOSTNAME | grep -i 'error'`
     if [ ! -z "$db_errors" ]; then
-        echo >&2 $db_errors
-        exit 1
+      echo >&2 $db_errors
+      exit 1
     fi
     # Break after 10s / until pid of "sleep 10s" is destroyed
     # Display logs and exit
     if [ -z "`ps -ef | grep $! | grep -o -E 'sleep 10s'`" ]; then
-        $COMPOSE logs --tail=40 $PEERTUBE_DB_HOSTNAME
-        exit 1
+      $COMPOSE logs --tail=40 $PEERTUBE_DB_HOSTNAME
+      exit 1
     fi
   done
+  echo >&2 "${GREEN}done${NC}"
   # Run restore command
-  echo >&2 "Restore existing dump..."
-  $COMPOSE exec -T $PEERTUBE_DB_HOSTNAME psql -U $POSTGRES_USER < ./docker-volume/pgdump
+  echo >&2 -n "Restore existing dump ... "
+  $COMPOSE exec -T $PEERTUBE_DB_HOSTNAME psql -q -U $POSTGRES_USER < ./docker-volume/pgdump
+  echo >&2 "${GREEN}done${NC}"
+  rm -f ./docker-volume/pgdump
 fi
 
 # Run one time before starting service
@@ -419,7 +434,7 @@ if [ ! -z "$compose_errors" ]; then
 fi
 
 # Block stdout until server is up
-echo >&2 "Wait until PeerTube server is up..."
+echo >&2 -n "Wait until PeerTube server is up ... "
 sleep 50s &
 while [ -z "`$COMPOSE logs --tail=2 peertube | grep -o 'Server listening on'`" ]; do
   # Break if any stack errors occur
@@ -436,7 +451,7 @@ while [ -z "`$COMPOSE logs --tail=2 peertube | grep -o 'Server listening on'`" ]
     exit 1
   fi
 done
-echo >&2 "PeerTube server is successfully up"
+echo >&2 "${GREEN}done${NC}"
 
 # Start service
 systemctl start --no-block peertube # be sure start process does not block stdout
