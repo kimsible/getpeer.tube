@@ -164,14 +164,6 @@ if [ "$missing_prerequisites" -ne 0 ]; then exit 1; fi
 echo >&2 "Create non-root system user (useradd -r -M -g docker docker) if non-exists"
 useradd >/dev/null 2>&1 -r -M -g docker docker # redirect out message if user already exists
 
-# Stop active peertube service to not conflict upgrade
-if [ -f "$SERVICE_PATCH" ]; then
-  if [ "`systemctl is-active peertube`"="active" ]; then
-    echo >&2 "Stop existing PeerTube service to not conflict upgrade"
-    systemctl >&2 stop peertube
-  fi
-fi
-
 # Other architectures than x86_64
 if [ -z "`uname -a | grep -o "x86_64"`" ]; then
   echo >&2 "Compose Binary can't be installed on your architecture"
@@ -203,6 +195,20 @@ fi
 echo >&2 "Create workdir $WORKDIR if non-exists"
 mkdir -p "$WORKDIR"
 cd "$WORKDIR"
+
+# Stop active peertube systemd service and dump database to not conflict upgrade
+if [ "`systemctl is-active peertube`"="active" ]; then
+  # Get postgres user
+  POSTGRES_USER="`grep -E -o "POSTGRES_USER=(.+)" .env | sed -E "s/POSTGRES_USER=//g"`"
+  # Get postgres service name
+  PEERTUBE_DB_HOSTNAME="`grep -E -o "PEERTUBE_DB_HOSTNAME=(.+)" .env | sed -E "s/PEERTUBE_DB_HOSTNAME=//g"`"
+  # Run dump command
+  echo >&2 "Dump existing database..."
+  $COMPOSE exec -T $PEERTUBE_DB_HOSTNAME pg_dumpall -U $POSTGRES_USER > ./docker-volume/pgdump
+  # Stop systemd service
+  echo >&2 "Stop existing PeerTube service to not conflict upgrade"
+  systemctl >&2 stop peertube
+fi
 
 # Init docker-volume and traefik directory
 echo >&2 "Create docker-volume/traefik if non-exists"
@@ -368,6 +374,40 @@ $COMPOSE >&2 pull
 # Enable peertube systemd service
 systemctl >/dev/null 2>&1 dameon-reload # redirect out possible errors
 systemctl >&2 enable peertube
+
+# Re-init existing database before starting peertube systemd service
+if [ -f ./docker-volume/pgdump ]; then
+  # Get postgres user
+  POSTGRES_USER="`grep -E -o "POSTGRES_USER=(.+)" .env | sed -E "s/POSTGRES_USER=//g"`"
+  # Get postgres db name
+  POSTGRES_DB="`grep -E -o "POSTGRES_DB=(.+)" .env | sed -E "s/POSTGRES_DB=//g"`"
+  # Get postgres service name
+  PEERTUBE_DB_HOSTNAME="`grep -E -o "PEERTUBE_DB_HOSTNAME=(.+)" .env | sed -E "s/PEERTUBE_DB_HOSTNAME=//g"`"
+  # Remove db files
+  rm -rf ./docker-volume/db
+  # Re-start postgres service
+  $COMPOSE up -d $PEERTUBE_DB_HOSTNAME
+  echo >&2 "Wait until PosgreSQL database is up..."
+  sleep 10s &
+  while [ -z "`$COMPOSE logs --tail=2 $PEERTUBE_DB_HOSTNAME | grep -o 'database system is ready to accept connections'`" ]; do
+    # Break if any database errors occur
+    # Displays errors and exit
+    db_errors=`$COMPOSE logs --tail=40 $PEERTUBE_DB_HOSTNAME | grep -i 'error'`
+    if [ ! -z "$db_errors" ]; then
+        echo >&2 $db_errors
+        exit 1
+    fi
+    # Break after 10s / until pid of "sleep 10s" is destroyed
+    # Display logs and exit
+    if [ -z "`ps -ef | grep $! | grep -o -E 'sleep 10s'`" ]; then
+        $COMPOSE logs --tail=40 $PEERTUBE_DB_HOSTNAME
+        exit 1
+    fi
+  done
+  # Run restore command
+  echo >&2 "Restore existing dump..."
+  $COMPOSE exec -T $PEERTUBE_DB_HOSTNAME psql -U $POSTGRES_USER < ./docker-volume/pgdump
+fi
 
 # Run one time before starting service
 echo >&2 "Start PeerTube service"
