@@ -10,7 +10,7 @@ PEERTUBE_DOCKER_RAW_URL=https://raw.githubusercontent.com/chocobozzz/PeerTube/de
 
 # Docker: needs version matching with v3.3 Compose file format
 # https://docs.docker.com/compose/compose-file/compose-versioning/
-DOCKER_PREREQUISITE_VERSION_NUMBER=17.06
+DOCKER_PREREQUISITE_RELEASE=17.06.01
 
 # Docker Compose binary path
 COMPOSE=/usr/local/bin/docker-compose
@@ -73,44 +73,50 @@ get_latest_release_name() {
   fi
 }
 
-get_release_version_number() {
+get_release_short() {
   release=$1
-  version_number=`echo "${release%.*}"`
-  echo "$version_number" | sed 's/v//g' # Remove prefix "v"
+  release_short=`echo "${release%.*}"`
+  echo "$release_short" | sed 's/v//g' # Remove prefix "v"
 }
 
-get_release_patch_number() {
+get_release_patch() {
   release=$1
   echo "${release##*.}"
+}
+
+get_release_major() {
+  release=$1
+  release_short=`get_release_short $release`
+  echo "${release_short%.*}"
+}
+
+get_release_minor() {
+  release=$1
+  release_short=`get_release_short $release`
+  echo "${release_short##*.}"
 }
 
 is_update() {
   current_release=$1
   latest_release=$2
-  current_version_number=`get_release_version_number "$current_release"`
-  latest_version_number=`get_release_version_number "$latest_release"`
-  if [ "$current_version_number" = "$latest_version_number" ]; then
-    current_patch_number=`get_release_patch_number "$current_release"`
-    latest_patch_number=`get_release_patch_number "$latest_release"`
-    # Patch to upgrade return 1, nothing to upgrade return 0
-    [ $(echo "$latest_patch_number < $current_patch_number" | bc -l) = 0 ] && true
+  current_short=`get_release_short "$current_release"`
+  latest_short=`get_release_short "$latest_release"`
+  if [ "$current_short" = "$latest_short" ]; then
+    current_patch=`get_release_patch "$current_release"`
+    latest_patch=`get_release_patch "$latest_release"`
+    [ "$latest_patch" -le "$current_patch" ] && true
   else
-    # Version (minor or major) to upgrade return 1, nothing to upgrade return 0
-    [ $(echo "$latest_version_number < $current_version_number" | bc -l) = 0 ] && true
+    latest_major=`get_release_major $latest_release`
+    latest_minor=`get_release_minor $latest_release`
+    current_major=`get_release_major $current_release`
+    current_minor=`get_release_minor $current_release`
+    [ "$latest_major" = "$current_major" ] && [ "$latest_minor" -le "$current_minor" ] && true || [ "$latest_major" -lt "$current_major" ] && true
   fi
 }
 
 get_current_release() {
   command=$1
   echo `$command` | grep -o -E "[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}"
-}
-
-check_prerequisite_version() {
-  current_release=$1
-  prerequisite_version_number=$2
-  current_version_number=`get_release_version_number "$current_release"`
-  # Prerequisite greater return 1, lower or equal return 0
-  [ $(echo "$current_version_number < $prerequisite_version_number" | bc -l) = 0 ] && true
 }
 
 
@@ -150,12 +156,12 @@ fi
 # docker
 if ! has "docker"; then
   missing_prerequisites=1
-  echo >&2 "- ${RED}ERROR${NC}: docker >= $DOCKER_PREREQUISITE_VERSION_NUMBER is missing"
+  echo >&2 "- ${RED}ERROR${NC}: docker >= $DOCKER_PREREQUISITE_RELEASE is missing"
 else
   docker_current_release=`get_current_release "docker -v"`
-  if ! check_prerequisite_version "$docker_current_release" "$DOCKER_PREREQUISITE_VERSION_NUMBER"; then
+  if ! is_update "$docker_current_release" "$DOCKER_PREREQUISITE_RELEASE"; then
     missing_prerequisites=1
-    echo >&2 "- ${RED}ERROR${NC}: docker >= $DOCKER_PREREQUISITE_VERSION_NUMBER is required, found $docker_current_release"
+    echo >&2 "- ${RED}ERROR${NC}: docker >= $DOCKER_PREREQUISITE_RELEASE is required, found $docker_current_release"
   else
     echo >&2 "- docker ${GREEN}OK${NC}"
   fi
@@ -181,16 +187,21 @@ if [ -z "`uname -a | grep -o "x86_64"`" ]; then
   fi
 else
   # Install or upgrade docker-compose
-  echo >&2 "Check latest release of Compose on GitHub Releases"
+  echo >&2 -n "Check latest release of Compose on GitHub Releases ... "
   compose_latest_release=`get_latest_release_name "docker/compose"`
+  echo >&2 "${GREEN}done${NC}"
   if ! has "$COMPOSE"; then
-    echo >&2 "Install Docker Compose $compose_latest_release"
+    echo >&2 -n "Install Docker Compose $compose_latest_release ... "
     get_docker_compose "$compose_latest_release"
+    echo >&2 "${GREEN}done${NC}"
   else
     compose_current_release=`get_current_release "$COMPOSE -v"`
     if ! is_update "$compose_current_release" "$compose_latest_release"; then
-      echo >&2 "Upgrade Docker Compose from "$compose_current_release" to $compose_latest_release"
+      echo >&2 -n "Upgrade Docker Compose from "$compose_current_release" to $compose_latest_release ... "
       get_docker_compose "$compose_latest_release"
+      echo >&2 "${GREEN}done${NC}"
+    else
+      echo >&2 "Nothing to update, using docker-compose found version $compose_current_release"
     fi
   fi
 fi
