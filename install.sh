@@ -119,6 +119,29 @@ get_current_release() {
   echo `$command` | grep -o -E "[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}"
 }
 
+up_postgres() {
+  service_name=$1
+  $COMPOSE up -d $service_name
+  echo >&2 -n "Wait until PosgreSQL database is up ... "
+  sleep 10s &
+  while [ -z "`$COMPOSE logs --tail=2 $service_name | grep -o 'database system is ready to accept connections'`" ]; do
+    # Break if any database errors occur
+    # Displays errors and exit
+    db_errors=`$COMPOSE logs --tail=40 $service_name | grep -i 'error'`
+    if [ ! -z "$db_errors" ]; then
+      echo >&2 $db_errors
+      exit 1
+    fi
+    # Break after 10s / until pid of "sleep 10s" is destroyed
+    # Display logs and exit
+    if [ -z "`ps -ef | grep $! | grep -o -E 'sleep 10s'`" ]; then
+      $COMPOSE logs --tail=40 $service_name
+      exit 1
+    fi
+  done
+  echo >&2 "${GREEN}done${NC}"
+}
+
 
 #################
 ##### MAIN ######
@@ -211,21 +234,30 @@ echo >&2 "Create workdir $WORKDIR if non-exists"
 mkdir -p "$WORKDIR/docker-volume"
 cd "$WORKDIR"
 
-# Stop active peertube systemd service and dump database to not conflict upgrade
-if [ "`systemctl is-active peertube`"="active" ]; then
+# Dump existing database to easier migrate if any PostgreSQL version upgrade
+# To proceed, a full Compose setup and a mounted database must exist (docker-volume/db, .env, docker-compose.yml)
+# No dump if Compose file or Compose setup upgrade are locked
+if [ -d docker-volume/db ] && [ -f .env ] && [ -f docker-compose.yml ] && [ ! "$LOCK_COMPOSE_SETUP" ] && [ ! "$LOCK_COMPOSE_FILE" ]; then
   # Get postgres user
   POSTGRES_USER="`grep -E -o "POSTGRES_USER=(.+)" .env | sed -E "s/POSTGRES_USER=//g"`"
+  # Get postgres db
+  POSTGRES_DB="`grep -E -o "POSTGRES_DB=(.+)" .env | sed -E "s/POSTGRES_DB=//g"`"
   # Get postgres service name
   PEERTUBE_DB_HOSTNAME="`grep -E -o "PEERTUBE_DB_HOSTNAME=(.+)" .env | sed -E "s/PEERTUBE_DB_HOSTNAME=//g"`"
-  # Run dump command
-  if [ ! -z "$($COMPOSE ps -q $PEERTUBE_DB_HOSTNAME)" ]; then
-    echo >&2 -n "Dump existing database ... "
-    $COMPOSE exec -T $PEERTUBE_DB_HOSTNAME pg_dumpall -U $POSTGRES_USER > ./docker-volume/pgdump
-    echo >&2 "${GREEN}done${NC}"
+  # if PostgreSQL container is stopped or does not exist, compose up
+  if [ -z "$($COMPOSE ps -q $PEERTUBE_DB_HOSTNAME)" ]; then
+    up_postgres "$PEERTUBE_DB_HOSTNAME"
   fi
-  # Stop systemd service
-  echo >&2 "Stop existing PeerTube service to not conflict upgrade"
-  systemctl >&2 stop peertube
+  # Run dump command
+  echo >&2 -n "Dump existing database to easier migrate ... "
+  $COMPOSE exec -T $PEERTUBE_DB_HOSTNAME pg_dump -U $POSTGRES_USER -Ft $POSTGRES_DB > ./docker-volume/db.tar
+  echo >&2 "${GREEN}done${NC}"
+fi
+
+# Down all containers to not conflict upgrade
+if [ -f .env ] && [ -f docker-compose.yml ]; then
+  echo >&2 "Down all containers to not conflict upgrade"
+  $COMPOSE down
 fi
 
 # Init docker-volume and traefik directory
@@ -398,41 +430,23 @@ systemctl >/dev/null 2>&1 dameon-reload # redirect out possible errors
 systemctl >&2 enable peertube
 
 # Re-init existing database before starting peertube systemd service
-if [ -f ./docker-volume/pgdump ]; then
+if [ -f ./docker-volume/db.tar ]; then
   # Get postgres user
   POSTGRES_USER="`grep -E -o "POSTGRES_USER=(.+)" .env | sed -E "s/POSTGRES_USER=//g"`"
-  # Get postgres db name
+  # Get postgres db
   POSTGRES_DB="`grep -E -o "POSTGRES_DB=(.+)" .env | sed -E "s/POSTGRES_DB=//g"`"
   # Get postgres service name
   PEERTUBE_DB_HOSTNAME="`grep -E -o "PEERTUBE_DB_HOSTNAME=(.+)" .env | sed -E "s/PEERTUBE_DB_HOSTNAME=//g"`"
   # Remove db files
   rm -rf ./docker-volume/db
   sleep 1s
-  # Re-start postgres service
-  $COMPOSE up -d $PEERTUBE_DB_HOSTNAME
-  echo >&2 -n "Wait until PosgreSQL database is up ... "
-  sleep 10s &
-  while [ -z "`$COMPOSE logs --tail=2 $PEERTUBE_DB_HOSTNAME | grep -o 'database system is ready to accept connections'`" ]; do
-    # Break if any database errors occur
-    # Displays errors and exit
-    db_errors=`$COMPOSE logs --tail=40 $PEERTUBE_DB_HOSTNAME | grep -i 'error'`
-    if [ ! -z "$db_errors" ]; then
-      echo >&2 $db_errors
-      exit 1
-    fi
-    # Break after 10s / until pid of "sleep 10s" is destroyed
-    # Display logs and exit
-    if [ -z "`ps -ef | grep $! | grep -o -E 'sleep 10s'`" ]; then
-      $COMPOSE logs --tail=40 $PEERTUBE_DB_HOSTNAME
-      exit 1
-    fi
-  done
-  echo >&2 "${GREEN}done${NC}"
+  # Up postgres service
+  up_postgres "$PEERTUBE_DB_HOSTNAME"
   # Run restore command
   echo >&2 -n "Restore existing dump ... "
-  $COMPOSE > /dev/null 2>&1 exec -T $PEERTUBE_DB_HOSTNAME psql -q -U $POSTGRES_USER < ./docker-volume/pgdump
+  $COMPOSE exec -T $PEERTUBE_DB_HOSTNAME pg_restore -U $POSTGRES_USER -d $POSTGRES_DB < ./docker-volume/db.tar
   echo >&2 "${GREEN}done${NC}"
-  rm -f ./docker-volume/pgdump
+  rm -f ./docker-volume/db.tar
 fi
 
 # Run one time before starting service
