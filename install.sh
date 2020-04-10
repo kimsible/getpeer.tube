@@ -395,7 +395,7 @@ User=docker
 Group=docker
 WorkingDirectory=$WORKDIR
 ExecStart=$COMPOSE up
-ExecStop=$COMPOSE down
+ExecStop=$COMPOSE stop peertube
 
 [Install]
 WantedBy=multi-user.target
