@@ -1,0 +1,84 @@
+version: "3.3"
+
+services:
+
+  reverse-proxy:
+    image: traefik:v1.7
+    network_mode: "host"
+    command:
+      - "--docker" # Tells Træfik to listen to docker
+      - "--acme.email=${TRAEFIK_ACME_EMAIL}" # Let's Encrypt ACME email
+      - "--acme.domains=${TRAEFIK_ACME_DOMAINS}" # Let's Encrypt ACME domain list
+    ports:
+      - "80:80"     # The HTTP port
+      - "443:443"   # The HTTPS port
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock # So that Traefik can listen to the Docker events
+      - ./docker-volume/traefik/acme.json:/etc/acme.json
+      - ./docker-volume/traefik/traefik.toml:/traefik.toml
+    restart: "always"
+    # If you want to use the Traefik dashboard, you should expose it on a
+    # subdomain with HTTPS and authentification:
+    # https://medium.com/@xavier.priour/secure-traefik-dashboard-with-https-and-password-in-docker-5b657e2aa15f
+    # https://github.com/containous/traefik/issues/880#issuecomment-310301168
+
+  peertube:
+    # If you don't want to use the official image and build one from sources
+    # build:
+    #   context: .
+    #   dockerfile: ./support/docker/production/Dockerfile.buster
+    image: chocobozzz/peertube:production-buster
+    env_file:
+      - .env
+    # Traefik labels are suggested as an example for people using Traefik,
+    # remove them if you are using another reverse proxy.
+    labels:
+      traefik.enable: "true"
+      traefik.frontend.rule: "Host:${PEERTUBE_WEBSERVER_HOSTNAME}"
+      traefik.port: "9000"
+    # If you don't want to use a reverse proxy (not suitable for production!)
+    # ports:
+      # - "80:9000"
+    volumes:
+      - ./docker-volume/data:/data
+      - ./docker-volume/config:/config
+    depends_on:
+      - postgres
+      - redis
+      - postfix
+    restart: "always"
+
+  postgres:
+    image: postgres:10-alpine
+    env_file:
+      - .env
+    volumes:
+      - ./docker-volume/db:/var/lib/postgresql/data
+    restart: "always"
+    labels:
+      traefik.enable: "false"
+
+  redis:
+    image: redis:4-alpine
+    volumes:
+      - ./docker-volume/redis:/data
+    restart: "always"
+    labels:
+      traefik.enable: "false"
+
+  postfix:
+    image: mwader/postfix-relay
+    env_file:
+      - .env
+    volumes:
+      - ./docker-volume/opendkim/keys:/etc/opendkim/keys
+    labels:
+      traefik.enable: "false"
+    restart: "always"
+
+networks:
+  default:
+    ipam:
+      driver: default
+      config:
+      - subnet:  172.18.0.0/16
