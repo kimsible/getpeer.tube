@@ -276,7 +276,7 @@ if [ ! -f  ./.env ]; then
 
   # Automatic filling .env
   # Replace .env variables with MY_EMAIL_ADDRESS, MY_DOMAIN, MY_POSTGRES_USERNAME and MY_POSTGRES_PASSWORD
-  sed -i -e "s/<MY POSTGRES DB>/peertube/g" .env
+
   if [ ! -z $MY_EMAIL_ADDRESS ]; then
     sed -i -e "s/<MY EMAIL ADDRESS>/$MY_EMAIL_ADDRESS/g" .env
   fi
