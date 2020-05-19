@@ -6,7 +6,7 @@
 #################
 
 # Peertube: https raw url of docker production PeerTube setup
-PEERTUBE_DOCKER_RAW_URL=https://raw.githubusercontent.com/kimsible/install-peertube/master
+PEERTUBE_DOCKER_RAW_URL=https://raw.githubusercontent.com/kimsible/install-peertube/v2.2.0-rc1
 
 # Docker: needs version matching with v3.3 Compose file format
 # https://docs.docker.com/compose/compose-file/compose-versioning/
