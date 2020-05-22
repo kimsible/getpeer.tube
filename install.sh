@@ -239,11 +239,11 @@ cd "$WORKDIR"
 # No dump if Compose file or Compose setup upgrade are locked
 if [ -d docker-volume/db ] && [ -f .env ] && [ -f docker-compose.yml ] && [ ! "$LOCK_COMPOSE_SETUP" ] && [ ! "$LOCK_COMPOSE_FILE" ]; then
   # Get postgres user
-  POSTGRES_USER="`grep -E -o "POSTGRES_USER=(.+)" .env | sed -E "s/POSTGRES_USER=//g"`"
+  POSTGRES_USER="`grep -E -o "^POSTGRES_USER=(.+)" .env | sed -E "s/POSTGRES_USER=//g"`"
   # Get postgres db
-  POSTGRES_DB="`grep -E -o "POSTGRES_DB=(.+)" .env | sed -E "s/POSTGRES_DB=//g"`"
+  POSTGRES_DB="`grep -E -o "^POSTGRES_DB=(.+)" .env | sed -E "s/POSTGRES_DB=//g"`"
   # Get postgres service name
-  PEERTUBE_DB_HOSTNAME="`grep -E -o "PEERTUBE_DB_HOSTNAME=(.+)" .env | sed -E "s/PEERTUBE_DB_HOSTNAME=//g"`"
+  PEERTUBE_DB_HOSTNAME="`grep -E -o "^PEERTUBE_DB_HOSTNAME=(.+)" .env | sed -E "s/PEERTUBE_DB_HOSTNAME=//g"`"
   # if PostgreSQL container is stopped or does not exist, compose up
   if [ -z "$($COMPOSE ps -q $PEERTUBE_DB_HOSTNAME)" ]; then
     up_postgres "$PEERTUBE_DB_HOSTNAME"
@@ -337,8 +337,8 @@ else
     fi
 
     # Get postgres username and password from existing PEERTUBE_DB_USERNAME and PEERTUBE_DB_PASSWORD in .env
-    MY_POSTGRES_USERNAME="`grep -E -o "PEERTUBE_DB_USERNAME=.*" ./.env | sed -E "s/PEERTUBE_DB_USERNAME=//g"`"
-    MY_POSTGRES_PASSWORD="`grep -E -o "PEERTUBE_DB_PASSWORD=.*" ./.env | sed -E "s/PEERTUBE_DB_PASSWORD=//g"`"
+    MY_POSTGRES_USERNAME="`grep -E -o "^PEERTUBE_DB_USERNAME=.*" ./.env | sed -E "s/PEERTUBE_DB_USERNAME=//g"`"
+    MY_POSTGRES_PASSWORD="`grep -E -o "^PEERTUBE_DB_PASSWORD=.*" ./.env | sed -E "s/PEERTUBE_DB_PASSWORD=//g"`"
 
     # If credentials not found exit script
     if [ -z "$MY_POSTGRES_USERNAME" ] || [ -z "$MY_POSTGRES_PASSWORD" ]; then
@@ -432,11 +432,11 @@ systemctl >&2 enable peertube
 # Re-init existing database before starting peertube systemd service
 if [ -f ./docker-volume/db.tar ]; then
   # Get postgres user
-  POSTGRES_USER="`grep -E -o "POSTGRES_USER=(.+)" .env | sed -E "s/POSTGRES_USER=//g"`"
+  POSTGRES_USER="`grep -E -o "^POSTGRES_USER=(.+)" .env | sed -E "s/POSTGRES_USER=//g"`"
   # Get postgres db
-  POSTGRES_DB="`grep -E -o "POSTGRES_DB=(.+)" .env | sed -E "s/POSTGRES_DB=//g"`"
+  POSTGRES_DB="`grep -E -o "^POSTGRES_DB=(.+)" .env | sed -E "s/POSTGRES_DB=//g"`"
   # Get postgres service name
-  PEERTUBE_DB_HOSTNAME="`grep -E -o "PEERTUBE_DB_HOSTNAME=(.+)" .env | sed -E "s/PEERTUBE_DB_HOSTNAME=//g"`"
+  PEERTUBE_DB_HOSTNAME="`grep -E -o "^PEERTUBE_DB_HOSTNAME=(.+)" .env | sed -E "s/PEERTUBE_DB_HOSTNAME=//g"`"
   # Remove db files
   rm -rf ./docker-volume/db
   sleep 1s
