@@ -5,8 +5,13 @@
 ### CONSTANTS ###
 #################
 
+# Default branch
+if [ ! "$GIT_BRANCH" ]; then
+  GIT_BRANCH="master"
+fi
+
 # Peertube: https raw url of docker production PeerTube setup
-PEERTUBE_DOCKER_RAW_URL=https://raw.githubusercontent.com/kimsible/install-peertube/master
+PEERTUBE_DOCKER_RAW_URL=https://raw.githubusercontent.com/kimsible/install-peertube/$GIT_BRANCH
 
 # Docker: needs version matching with v3.3 Compose file format
 # https://docs.docker.com/compose/compose-file/compose-versioning/
@@ -39,10 +44,11 @@ has() {
 get_latest_file() {
   remote_path=$1
   local_path=$2
+
   if has "curl"; then
-    curl -sSL $PEERTUBE_DOCKER_RAW_URL$remote_path > $local_path
+    curl -#fL $PEERTUBE_DOCKER_RAW_URL$remote_path -o $local_path 2>&1 || exit 1
   elif has "wget"; then
-    wget -nv $PEERTUBE_DOCKER_RAW_URL$remote_path -O $local_path
+    wget -nv $PEERTUBE_DOCKER_RAW_URL$remote_path -O $local_path 2>&1 || exit 1
   fi
 }
 
@@ -51,9 +57,9 @@ get_docker_compose() {
   release=$1
   download_url="https://github.com/docker/compose/releases/download/$release/docker-compose-`uname -s`-`uname -m`"
   if has "curl"; then
-    curl -sSL $download_url -o /usr/local/bin/docker-compose
+    curl -#fL $download_url -o /usr/local/bin/docker-compose 2>&1 || exit 1
   elif has "wget"; then
-    wget -nv $download_url -O /usr/local/bin/docker-compose
+    wget -nv $download_url -O /usr/local/bin/docker-compose 2>&1 || exit 1
   fi
   chmod +x /usr/local/bin/docker-compose
 }
@@ -269,10 +275,14 @@ echo >&2 "Create docker-volume/traefik/acme.json if non-exists"
 touch docker-volume/traefik/acme.json
 chmod 600 docker-volume/traefik/acme.json
 
+# Init nginx directory
+echo >&2 "Create docker-volume/nginx if non-exists"
+mkdir -p docker-volume/nginx
+
 # Copy .env
 if [ ! -f  ./.env ]; then
   echo >&2 "Get latest environment variables .env"
-  get_latest_file "/.env" ".env"
+  get_latest_file "/docker/.env" ".env" || exit 1
 
   # Automatic filling .env
   # Replace .env variables with MY_EMAIL_ADDRESS, MY_DOMAIN, MY_POSTGRES_USERNAME and MY_POSTGRES_PASSWORD
@@ -296,7 +306,7 @@ else
     echo >&2 "Keep existing environment variables .env"
   else
     echo >&2 "Get latest environment variables .env"
-    get_latest_file "/.env" ".env.new"
+    get_latest_file "/docker/.env" ".env.new" || exit 1
 
     # Make sure new .env is well downloaded with patterns to replace
     if [ ! -f ./.env.new ]; then
@@ -355,18 +365,50 @@ else
   fi
 fi
 
-# Copy traefik.toml
+# Copy traefik config
 if [ ! -f ./docker-volume/traefik/traefik.toml ] || [ ! "$LOCK_COMPOSE_SETUP" ] && [ ! "$LOCK_TRAEFIK_CONFIG" ]; then
   echo >&2 "Get latest reverse-proxy config docker-volume/traefik/traefik.toml"
-  get_latest_file "/config/traefik.toml" "docker-volume/traefik/traefik.toml"
+  get_latest_file "/traefik/traefik.toml" "docker-volume/traefik/traefik.toml"
 else
   echo >&2 "Keep existing reverse-proxy config docker-volume/traefik/traefik.toml"
+fi
+
+# Copy nginx config
+if [ ! -f ./docker-volume/nginx/peertube ] || [ ! "$LOCK_COMPOSE_SETUP" ] && [ ! "$LOCK_NGINX_SETUP" ]; then
+  echo >&2 "Get latest webserver nginx config docker-volume/nginx/peertube"
+  get_latest_file "/nginx/peertube" "docker-volume/nginx/peertube"
+else
+  echo >&2 "Keep existing webserver nginx config docker-volume/nginx/peertube"
+fi
+
+# Copy Dockerfile.nginx
+if [ ! -f ./Dockerfile.nginx ] || [ ! "$LOCK_COMPOSE_SETUP" ] && [ ! "$LOCK_NGINX_DOCKERFILE" ]; then
+  echo >&2 "Get latest Dockerfile.nginx"
+  get_latest_file "/docker/Dockerfile.nginx" "Dockerfile.nginx"
+else
+  echo >&2 "Keep existing Dockerfile.nginx"
+fi
+
+# Copy entrypoint.nginx.sh
+if [ ! -f ./entrypoint.nginx.sh ] || [ ! "$LOCK_COMPOSE_SETUP" ] && [ ! "$LOCK_NGINX_DOCKERFILE" ]; then
+  echo >&2 "Get latest entrypoint.nginx.sh"
+  get_latest_file "/docker/entrypoint.nginx.sh" "entrypoint.nginx.sh"
+else
+  echo >&2 "Keep existing entrypoint.nginx.sh"
+fi
+
+# Copy docker-compose.traefik.yml
+if [ ! -f ./docker-compose.yml ] || [ ! "$LOCK_COMPOSE_SETUP" ] && [ ! "$LOCK_COMPOSE_FILE" ]; then
+  echo >&2 "Get latest docker-compose.traefik.yml"
+  get_latest_file "/docker/docker-compose.traefik.yml" "docker-compose.traefik.yml"
+else
+  echo >&2 "Keep existing docker-compose.traefik.yml"
 fi
 
 # Copy docker-compose.yml
 if [ ! -f ./docker-compose.yml ] || [ ! "$LOCK_COMPOSE_SETUP" ] && [ ! "$LOCK_COMPOSE_FILE" ]; then
   echo >&2 "Get latest docker-compose.yml"
-  get_latest_file "/docker-compose.yml" "docker-compose.yml"
+  get_latest_file "/docker/docker-compose.yml" "docker-compose.yml"
 else
   echo >&2 "Keep existing docker-compose.yml"
 fi
@@ -394,7 +436,7 @@ StartLimitBurst=3
 User=docker
 Group=docker
 WorkingDirectory=$WORKDIR
-ExecStart=$COMPOSE up
+ExecStart=$COMPOSE -f docker-compose.yml -f docker-compose.traefik.yml up
 ExecStop=$COMPOSE stop peertube
 
 [Install]

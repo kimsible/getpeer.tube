@@ -58,9 +58,11 @@ You can also download and run [the script](https://raw.github.com/kimsible/insta
   - Generate or use existing PostgreSQL credentials
   - Use defined `MY_EMAIL_ADDRESS` and `MY_DOMAIN` or wait for editing updated `.env`
   - Prevent Custom Compose Setup from updating if `LOCK_COMPOSE_SETUP` is defined
+  - Prevent Custom Nginx Dockerfile from updating if `LOCK_NGINX_DOCKERFILE` is defined
   - Prevent `.env` from updating if `LOCK_COMPOSE_ENV` is defined
-  - Prevent `docker-compose.yml` from updating if `LOCK_COMPOSE_FILE` is defined
-  - Prevent `traefik.toml` from updating if `LOCK_TRAEFIK_CONFIG` is defined
+  - Prevent `docker-compose.yml` and `docker-compose.traefik.yml`  from updating if `LOCK_COMPOSE_FILE` is defined
+  - Prevent `docker-volume/traefik/traefik.toml` from updating if `LOCK_TRAEFIK_CONFIG` is defined
+  - Prevent `docker-volume/nginx/peertube` from updating if `LOCK_NGINX_CONFIG` is defined
 - Create or update `peertube.service`
 - Pull latest images
 - Run `peertube.service`
@@ -82,6 +84,14 @@ docker network prune
 ```
 
 ## Development
+
+Basic usage with **cURL** or **Wget**.
+```shell
+GIT_BRANCH=develop sh -c "$(curl -fsSL https://raw.github.com/kimsible/install-peertube/develop/install.sh)"
+```
+```shell
+GIT_BRANCH=develop sh -c "$(wget https://raw.github.com/kimsible/install-peertube/develop/install.sh -O -)"
+```
 
 Magic command to reset all docker containers, images, volumes and networks.
 
