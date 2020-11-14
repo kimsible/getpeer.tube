@@ -1,0 +1,252 @@
+#!/usr/bin/env sh
+
+# Docker Compose binary path
+COMPOSE=/usr/local/bin/docker-compose
+
+# Peertube: https raw url of docker production PeerTube setup
+PEERTUBE_DOCKER_RAW_URL=https://raw.githubusercontent.com/kimsible/install-peertube/master/install.sh
+
+# PeerTube Working directory
+WORKDIR=/var/peertube
+
+# Colors
+RED='\033[0;31m'
+NC='\033[0m' # No Color
+
+# Response Type
+ERROR=${RED}ERROR${NC}
+
+# SERVER_TOOLS LIST
+SERVER_TOOLS="
+parse-log
+create-transcoding-job
+create-import-video-file-job
+prune-storage
+optimize-old-videos
+update-host
+reset-password
+plugin:install
+plugin:uninstall
+purge-old-account
+psql
+postgres:down
+postgres:dump
+postgres:restore
+postgres:up
+up
+down
+upgrade
+show-dkim
+show-admin
+"
+
+#################
+### FUNCTIONS ###
+#################
+
+# Test if a program is installed
+has() {
+  type "$1" > /dev/null 2>&1
+}
+
+# Limit command to Server Tools List
+if [ -z $1 ] || [ -z "`echo $SERVER_TOOLS | grep -o -w $1`" ]; then
+  echo "\nUsage:	peertube SERVER_TOOL\n"
+  echo "Server Tools:\n$SERVER_TOOLS"
+  exit 1
+fi
+
+# Go to workir
+cd $WORKDIR
+
+missing_prerequisites=0
+
+if [ ! -f .env ]; then
+  echo "$ERROR: Docker-compose ENV VARS `$WORKDIR/docker-volume/.env` not found, can't run `peertube $1`."
+fi
+
+if [ ! -f docker-compose.yml ]; then
+  echo "$ERROR: Docker-compose file `$WORKDIR/docker-volume/docker-compose.yml` not found, can't run `peertube $1`."
+fi
+
+# Exit if not all prerequisites
+if [ "$missing_prerequisites" -ne 0 ]; then exit 1; fi
+
+# Get postgres user
+POSTGRES_USER="`grep -E -o "^POSTGRES_USER=(.+)" .env | sed -E "s/POSTGRES_USER=//g"`"
+
+# Get postgres db
+POSTGRES_DB="`grep -E -o "^POSTGRES_DB=(.+)" .env | sed -E "s/POSTGRES_DB=//g"`"
+
+# Get postgres service name
+PEERTUBE_DB_HOSTNAME="`grep -E -o "^PEERTUBE_DB_HOSTNAME=(.+)" .env | sed -E "s/PEERTUBE_DB_HOSTNAME=//g"`"
+
+if [ "$1" = "purge-old-account" ]; then
+
+  username=$2
+  if [ -z "$username" ]; then
+    echo "\nUsage:	peertube purge-old-account USERNAME\n"
+    exit 1
+  fi
+
+  count=`$COMPOSE exec -T $PEERTUBE_DB_HOSTNAME psql -t -U $POSTGRES_USER $POSTGRES_DB -c "SELECT count(*) FROM account WHERE name = '$username';" | xargs`
+  if [ "$count" -gt 0 ]; then
+    echo "$ERROR: can't purge an existing account"
+    exit 1
+  fi
+
+  # Run psql delete command
+  channelname=$username"_channel"
+  $COMPOSE exec -T $PEERTUBE_DB_HOSTNAME psql -e -U $POSTGRES_USER $POSTGRES_DB -c "DELETE FROM actor WHERE \"preferredUsername\" = '$username';"
+  $COMPOSE exec -T $PEERTUBE_DB_HOSTNAME psql -e -U $POSTGRES_USER $POSTGRES_DB -c "DELETE FROM actor WHERE \"preferredUsername\" = '$channelname';"
+
+elif [ "$1" = "psql" ]; then
+
+  # Run psql command
+  $COMPOSE exec -T $PEERTUBE_DB_HOSTNAME psql -U $POSTGRES_USER $POSTGRES_DB -c "$2"
+
+elif [ "$1" = "postgres:down" ]; then
+
+  # Stop and remove PostgreSQL container
+  $COMPOSE rm -f -s -v $PEERTUBE_DB_HOSTNAME
+
+elif [ "$1" = "postgres:dump" ]; then
+
+  if [ -z $2 ]; then
+    echo "Usage:	peertube postgres:dump /PATH/FILENAME.tar"
+    exit 1
+  fi
+
+  # Do not restore if PostgreSQL container is down
+  if [ -z "$($COMPOSE ps -q $PEERTUBE_DB_HOSTNAME)" ]; then
+    echo "$ERROR: PostgreSQL docker container is down, can't dump. First, you must run `peertube database:start`"
+    exit 1
+  fi
+
+  # Dump PostgreSQL database
+  $COMPOSE exec -T $PEERTUBE_DB_HOSTNAME pg_dump -U $POSTGRES_USER -Ft $POSTGRES_DB > $2
+
+elif [ "$1" = "postgres:restore" ]; then
+
+  if [ -z $2 ]; then
+    echo "Usage:	peertube postgres:restore /PATH/FILENAME.tar"
+    exit 1
+  fi
+
+  missing_prerequisites=0
+
+  if [ ! -f "$2" ]; then
+    echo "$ERROR: Database dump archive `$2` not found, can't restore."
+    missing_prerequisites=1
+  fi
+
+  # Do not restore if PostgreSQL container is down
+  if [ -z "$($COMPOSE ps -q $PEERTUBE_DB_HOSTNAME)" ]; then
+    echo "$ERROR: PostgreSQL docker container is down, can't restore. First, you must run `peertube database:start`"
+    missing_prerequisites=1
+  fi
+
+  # Exit if not all prerequisites
+  if [ "$missing_prerequisites" -ne 0 ]; then exit 1; fi
+
+  # Run restore command
+  $COMPOSE exec -T $PEERTUBE_DB_HOSTNAME pg_restore -U $POSTGRES_USER -d $POSTGRES_DB < $2
+
+elif [ "$1" = "postgres:up" ]; then
+
+  $COMPOSE -f docker-compose.yml -f docker-compose.traefik.yml up -d $PEERTUBE_DB_HOSTNAME
+
+  # Block stdout until database is up
+  sleep 10s &
+  while [ -z "`$COMPOSE logs --tail=2 $PEERTUBE_DB_HOSTNAME | grep -o 'database system is ready to accept connections'`" ]; do
+    # Break if any database errors occur
+    # Displays errors and exit
+    db_errors=`$COMPOSE logs --tail=40 $PEERTUBE_DB_HOSTNAME | grep -i 'error'`
+    if [ ! -z "$db_errors" ]; then
+      echo $db_errors
+      exit 1
+    fi
+    # Break after 10s / until pid of "sleep 10s" is destroyed
+    # Display logs and exit
+    if [ -z "`ps -ef | grep $! | grep -o -E 'sleep 10s'`" ]; then
+      $COMPOSE logs --tail=40 $PEERTUBE_DB_HOSTNAME
+      exit 1
+    fi
+  done
+
+elif [ "$1" = "up" ]; then
+
+  # Run compose detached and exit if any errors
+  compose_errors=`$($COMPOSE -f docker-compose.yml -f docker-compose.traefik.yml up --build -d) | grep -i 'ERROR'`
+  if [ ! -z "$compose_errors" ]; then
+    exit 1
+  fi
+
+  # Block stdout until server is up
+  sleep 50s &
+  while [ -z "`$COMPOSE logs --tail=2 peertube | grep -o 'Server listening on'`" ]; do
+    # Break if any stack errors occur
+    # Displays errors and exit
+    stack_errors=`$COMPOSE logs --tail=40 peertube | grep -i 'error'`
+    if [ ! -z "$stack_errors" ]; then
+      echo $stack_errors
+      exit 1
+    fi
+    # Break after 50s / until pid of "sleep 50s" is destroyed
+    # Display logs and exit
+    if [ -z "`ps -ef | grep $! | grep -o -E 'sleep 50s'`" ]; then
+      $COMPOSE logs --tail=40 peertube
+      exit 1
+    fi
+  done
+
+elif [ "$1" = "down" ]; then
+
+  $COMPOSE down --remove-orphans
+
+fi
+
+elif [ "$1" = "upgrade" ]; then
+
+  if has "curl"; then
+    sh -c "$(curl -f#L $PEERTUBE_DOCKER_RAW_URL)" >&2
+  elif has "wget"; then
+    sh -c "$(wget -nv $PEERTUBE_DOCKER_RAW_URL -O -)" >&2
+  fi
+
+elif [ "$1" = "show-dkim" ]; then
+
+  cat ./docker-volume/opendkim/keys/*/*.txt
+
+elif [ "$1" = "show-admin" ]; then
+
+  username=`$COMPOSE logs peertube | grep -A1 -E -o "Username: [0-9a-zAZ-Z]*"`
+  password=`$COMPOSE logs peertube | grep -A1 -E -o "User password: [0-9a-zAZ-Z]*"`
+
+  if [ ! -z "$username" ] && [ ! -z "$password" ]; then
+    echo $username
+    echo $password
+  else # If credentials are not found in compose logs
+    if [ ! -f docker-volume/data/logs/peertube.log ]; then
+      echo "$ERROR: Can't display Admin Credentials, missing docker-volume/data/logs/peertube.log"
+      exit 1
+    else
+      username=`cat docker-volume/data/logs/peertube.log | grep -A1 -E -o "Username: [0-9a-zAZ-Z]*"`
+      password=`cat docker-volume/data/logs/peertube.log | grep -A1 -E -o "User password: [0-9a-zAZ-Z]*"`
+
+      if [ ! -z "$username" ] && [ ! -z "$password" ]; then
+        echo $username
+        echo $password
+      else
+        echo "$ERROR: Missing Admin Credentials in logs"
+        exit 1
+      fi
+    fi
+  fi
+
+else
+
+  # Run ServerTools command
+  $COMPOSE exec -u peertube -e NODE_CONFIG_DIR=/config -e NODE_ENV=production peertube npm run $@
+
+fi
