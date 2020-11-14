@@ -23,13 +23,26 @@ COMPOSE=/usr/local/bin/docker-compose
 # PeerTube Working directory
 WORKDIR=/var/peertube
 
+# PeerTube CLI binary path
+CLI=/usr/sbin/peertube
+
+# PeerTube Archive Dump for upgrade
+DB_DUMP=/tmp/peertube-db-dump.tar
+
 # PeerTube Service Path
 SERVICE_PATH=/etc/systemd/system/peertube.service
 
 # Colors
+ORANGE='\033[0;33m'
 GREEN='\033[0;32m'
 RED='\033[0;31m'
 NC='\033[0m' # No Color
+
+# Response Type
+WARNING=${ORANGE}WARNING${NC}
+ERROR=${RED}ERROR${NC}
+OK=${GREEN}OK${NC}
+DONE=${GREEN}done${NC}
 
 #################
 ### FUNCTIONS ###
@@ -46,9 +59,9 @@ get_latest_file() {
   local_path=$2
 
   if has "curl"; then
-    curl -#fL $PEERTUBE_DOCKER_RAW_URL$remote_path -o $local_path 2>&1 || exit 1
+    curl -#fL $PEERTUBE_DOCKER_RAW_URL$remote_path -o $local_path 2>&1 || (echo "Request URL: $PEERTUBE_DOCKER_RAW_URL$remote_path" && exit 1)
   elif has "wget"; then
-    wget -nv $PEERTUBE_DOCKER_RAW_URL$remote_path -O $local_path 2>&1 || exit 1
+    wget -nv $PEERTUBE_DOCKER_RAW_URL$remote_path -O $local_path 2>&1 || (echo "Request URL: $PEERTUBE_DOCKER_RAW_URL$remote_path" && exit 1)
   fi
 }
 
@@ -125,74 +138,53 @@ get_current_release() {
   echo `$command` | grep -o -E "[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}"
 }
 
-up_postgres() {
-  service_name=$1
-  $COMPOSE up -d $service_name
-  echo >&2 -n "Wait until PosgreSQL database is up ... "
-  sleep 10s &
-  while [ -z "`$COMPOSE logs --tail=2 $service_name | grep -o 'database system is ready to accept connections'`" ]; do
-    # Break if any database errors occur
-    # Displays errors and exit
-    db_errors=`$COMPOSE logs --tail=40 $service_name | grep -i 'error'`
-    if [ ! -z "$db_errors" ]; then
-      echo >&2 $db_errors
-      exit 1
-    fi
-    # Break after 10s / until pid of "sleep 10s" is destroyed
-    # Display logs and exit
-    if [ -z "`ps -ef | grep $! | grep -o -E 'sleep 10s'`" ]; then
-      $COMPOSE logs --tail=40 $service_name
-      exit 1
-    fi
-  done
-  echo >&2 "${GREEN}done${NC}"
+get_env_var() {
+  echo `grep -E -o "^$1=.*" ./.env | sed -E "s/$1=//g"`
 }
-
 
 #################
 ##### MAIN ######
 #################
-echo >&2 "> Get latest PeerTube Docker setup into $WORKDIR <"
 
-echo >&2 "Prerequisites"
+echo "Prerequisites #"
 missing_prerequisites=0
 
 # root
 uid=`id -u`
 if [ "$uid" -ne 0 ]; then
   missing_prerequisites=1
-  echo >&2 "- ${RED}ERROR${NC}: this script must be run as root or as a sudoer user with sudo"
+  echo "- $ERROR: this script must be run as root or as a sudoer user with sudo"
 else
-  echo >&2 "- root ${GREEN}OK${NC}"
+  echo "- root $OK"
 fi
 
 # systemd
 if ! has "systemctl"; then
   missing_prerequisites=1
-  echo >&2 "- ${RED}ERROR${NC}:systemd is missing"
+  echo "- $ERROR:systemd is missing"
 else
-  echo >&2 "- systemd ${GREEN}OK${NC}"
+  echo "- systemd $OK"
 fi
 
 # curl or wget
 if ! has "curl" && ! has "wget"; then
   missing_prerequisites=1
-  echo >&2 "- ${RED}ERROR${NC}: curl or wget are required, both are missing"
+  echo "- $ERROR: curl or wget are required, both are missing"
 else
-  echo >&2 "- curl / wget ${GREEN}OK${NC}"
+  echo "- curl / wget $OK"
 fi
 
 # docker
 if ! has "docker"; then
   missing_prerequisites=1
-  echo >&2 "- ${RED}ERROR${NC}: docker >= $DOCKER_PREREQUISITE_RELEASE is missing"
+  echo "- $ERROR: docker >= $DOCKER_PREREQUISITE_RELEASE is missing"
 else
   docker_current_release=`get_current_release "docker -v"`
   if ! is_update "$docker_current_release" "$DOCKER_PREREQUISITE_RELEASE"; then
     missing_prerequisites=1
-    echo >&2 "- ${RED}ERROR${NC}: docker >= $DOCKER_PREREQUISITE_RELEASE is required, found $docker_current_release"
+    echo "- $ERROR: docker >= $DOCKER_PREREQUISITE_RELEASE is required, found $docker_current_release"
   else
-    echo >&2 "- docker ${GREEN}OK${NC}"
+    echo "- docker $OK"
   fi
 fi
 
@@ -200,229 +192,203 @@ fi
 if [ "$missing_prerequisites" -ne 0 ]; then exit 1; fi
 
 # Docker: make sure a non-root docker user system exists
-echo >&2 "Create non-root system user (useradd -r -M -g docker docker) if non-exists"
+echo -n "Create non-root system user (useradd -r -M -g docker docker) if non-exists ..."
 useradd >/dev/null 2>&1 -r -M -g docker docker # redirect out message if user already exists
+echo $DONE
 
 # Other architectures than x86_64
 if [ -z "`uname -a | grep -o "x86_64"`" ]; then
-  echo >&2 "Compose Binary can't be installed on your architecture"
+  echo "$WARNING: Compose Binary can't be installed on your architecture"
   COMPOSE="docker-compose"
   if ! has "$COMPOSE"; then
-    echo >&2 "Unfortunately docker-compose is not installed on your system"
+    echo "$ERROR: Unfortunately docker-compose is not installed on your system"
     exit 1
   else
     compose_current_release=`get_current_release "$COMPOSE -v"`
-    echo >&2 "Using system docker-compose, found version $compose_current_release"
+    echo "Using system docker-compose, found version $compose_current_release"
   fi
 else
   # Install or upgrade docker-compose
-  echo >&2 -n "Check latest release of Compose on GitHub Releases ... "
+  echo -n "Check latest release of Compose on GitHub Releases ..."
   compose_latest_release=`get_latest_release_name "docker/compose"`
-  echo >&2 "${GREEN}done${NC}"
+  echo $DONE
+
   if ! has "$COMPOSE"; then
-    echo >&2 -n "Install Docker Compose $compose_latest_release ... "
+    echo "Install Docker Compose $compose_latest_release #"
     get_docker_compose "$compose_latest_release"
-    echo >&2 "${GREEN}done${NC}"
   else
     compose_current_release=`get_current_release "$COMPOSE -v"`
+
     if ! is_update "$compose_current_release" "$compose_latest_release"; then
-      echo >&2 -n "Upgrade Docker Compose from "$compose_current_release" to $compose_latest_release ... "
+      echo "Upgrade Docker Compose from "$compose_current_release" to $compose_latest_release #"
       get_docker_compose "$compose_latest_release"
-      echo >&2 "${GREEN}done${NC}"
     else
-      echo >&2 "Nothing to update, using docker-compose found version $compose_current_release"
+      echo "Nothing to update, using docker-compose found version $compose_current_release"
     fi
   fi
 fi
 
 # Init workdir
-echo >&2 "Create workdir $WORKDIR if non-exists"
+echo -n "Create workdir $WORKDIR if non-exists ..."
 mkdir -p "$WORKDIR/docker-volume"
 cd "$WORKDIR"
+echo $DONE
+
+# Get latest peertube cli
+echo "Get latest peertube cli #"
+rm -f $CLI
+get_latest_file "/cli/peertube" "$CLI"
+chmod +x $CLI
 
 # Dump existing database to easier migrate if any PostgreSQL version upgrade
 # To proceed, a full Compose setup and a mounted database must exist (docker-volume/db, .env, docker-compose.yml)
-# No dump if Compose file or Compose setup upgrade are locked
-if [ -d docker-volume/db ] && [ -f .env ] && [ -f docker-compose.yml ] && [ ! "$LOCK_COMPOSE_SETUP" ] && [ ! "$LOCK_COMPOSE_FILE" ]; then
-  # Get postgres user
-  POSTGRES_USER="`grep -E -o "^POSTGRES_USER=(.+)" .env | sed -E "s/POSTGRES_USER=//g"`"
-  # Get postgres db
-  POSTGRES_DB="`grep -E -o "^POSTGRES_DB=(.+)" .env | sed -E "s/POSTGRES_DB=//g"`"
-  # Get postgres service name
-  PEERTUBE_DB_HOSTNAME="`grep -E -o "^PEERTUBE_DB_HOSTNAME=(.+)" .env | sed -E "s/PEERTUBE_DB_HOSTNAME=//g"`"
-  # if PostgreSQL container is stopped or does not exist, compose up
-  if [ -z "$($COMPOSE ps -q $PEERTUBE_DB_HOSTNAME)" ]; then
-    up_postgres "$PEERTUBE_DB_HOSTNAME"
-  fi
-  # Run dump command
-  echo >&2 -n "Dump existing database to easier migrate ... "
-  $COMPOSE exec -T $PEERTUBE_DB_HOSTNAME pg_dump -U $POSTGRES_USER -Ft $POSTGRES_DB > ./docker-volume/db.tar
-  echo >&2 "${GREEN}done${NC}"
+if [ -d docker-volume/db ] && [ -f .env ] && [ -f docker-compose.yml ]; then
+  # Up PostgreSQL container
+  echo "Up PostgreSQL if down #"
+  $CLI postgres:up
+
+  # Dump existing database
+  echo "Dump PostgreSQL to easier migrate #"
+  $CLI postgres:dump $DB_DUMP
 fi
 
 # Down all containers to not conflict upgrade
 if [ -f .env ] && [ -f docker-compose.yml ]; then
-  echo >&2 "Down all containers to not conflict upgrade"
-  $COMPOSE down
+  echo "Down all containers to not conflict upgrade #"
+  $CLI down
 fi
 
 # Init docker-volume and traefik directory
-echo >&2 "Create docker-volume/traefik if non-exists"
+echo -n "Create docker-volume/traefik if non-exists ..."
 mkdir -p docker-volume/traefik
+echo $DONE
 
 # Create traefik acme config
-echo >&2 "Create docker-volume/traefik/acme.json if non-exists"
+echo -n "Create docker-volume/traefik/acme.json if non-exists ..."
 touch docker-volume/traefik/acme.json
 chmod 600 docker-volume/traefik/acme.json
+echo $DONE
 
 # Init nginx directory
-echo >&2 "Create docker-volume/nginx if non-exists"
+echo -n "Create docker-volume/nginx if non-exists ..."
 mkdir -p docker-volume/nginx
+echo $DONE
 
-# Copy .env
-if [ ! -f  ./.env ]; then
-  echo >&2 "Get latest environment variables .env"
-  get_latest_file "/docker/.env" ".env" || exit 1
+if [ -f .env ]; then # If .env exists keep existing environment variables
+  echo -n "Get existing PostgreSQL credentials in .env file ..."
+  MY_POSTGRES_USERNAME="`get_env_var 'PEERTUBE_DB_USERNAME'`"
+  MY_POSTGRES_PASSWORD="`get_env_var 'PEERTUBE_DB_PASSWORD'`"
+  echo $DONE
 
-  # Automatic filling .env
-  # Replace .env variables with MY_EMAIL_ADDRESS, MY_DOMAIN, MY_POSTGRES_USERNAME and MY_POSTGRES_PASSWORD
-
-  if [ ! -z $MY_EMAIL_ADDRESS ]; then
-    sed -i -e "s/<MY EMAIL ADDRESS>/$MY_EMAIL_ADDRESS/g" .env
-  fi
-  if [ ! -z $MY_DOMAIN ]; then
-    sed -i -e "s/<MY DOMAIN>/$MY_DOMAIN/g" .env
+  # Exit if PostgreSQL credentials not found
+  if [ -z $MY_POSTGRES_USERNAME ] && [ -z $MY_POSTGRES_PASSWORD ]; then
+    echo "\n$ERROR: PostgreSQL username or password not found in $WORKDIR/.env, can't upgrade"
+    exit 1
   fi
 
-  # Randomize postgres username and password
+  # Get email and domain
+  echo -n "Get existing email and domain in .env file ..."
+  MY_EMAIL_ADDRESS="`get_env_var 'PEERTUBE_ADMIN_EMAIL'`"
+  MY_DOMAIN="`get_env_var 'PEERTUBE_WEBSERVER_HOSTNAME'`"
+  echo $DONE
+
+  [ -z $MY_EMAIL_ADDRESS ] && echo "$WARNING: admin email not found in $WORKDIR/.env"
+  [ -z $MY_DOMAIN ] && echo "$WARNING: domain not found in $WORKDIR/.env"
+else # If not randomize PostgreSQL username and password
+  echo -n "Randomize PostgreSQL credentials ..."
+
   MY_POSTGRES_USERNAME="`head /dev/urandom | tr -dc A-Za-z0-9 | head -c 10`"
   MY_POSTGRES_PASSWORD=`date +%s | sha256sum | base64 | head -c 32`
 
-  # Replace them in .env
-  sed -i -e "s/<MY POSTGRES USERNAME>/$MY_POSTGRES_USERNAME/g" .env
-  sed -i -e "s/<MY POSTGRES PASSWORD>/$MY_POSTGRES_PASSWORD/g" .env
-else
-  if [ "$LOCK_COMPOSE_SETUP" = true ] || [ "$LOCK_COMPOSE_ENV" = true ]; then
-    echo >&2 "Keep existing environment variables .env"
+  echo $DONE
+
+  [ -z $MY_EMAIL_ADDRESS ] && echo "$WARNING: MY_EMAIL_ADDRESS is not defined"
+  [ -z $MY_DOMAIN ] && echo "$WARNING: MY_DOMAIN is not defined"
+fi
+
+# Display used environment variables
+[ ! -z $MY_EMAIL_ADDRESS ] && echo "Using MY_EMAIL_ADDRESS=$MY_EMAIL_ADDRESS $OK"
+[ ! -z $MY_DOMAIN ] && echo "Using MY_DOMAIN=$MY_DOMAIN $OK"
+
+# Create / override .env
+echo -n "Generate .env file ..."
+
+cat <<EOT > .env
+POSTGRES_USER=<MY POSTGRES USERNAME>
+POSTGRES_PASSWORD=<MY POSTGRES PASSWORD>
+POSTGRES_DB=peertube
+PEERTUBE_DB_USERNAME=<MY POSTGRES USERNAME>
+PEERTUBE_DB_PASSWORD=<MY POSTGRES PASSWORD>
+PEERTUBE_DB_HOSTNAME=postgres
+PEERTUBE_WEBSERVER_HOSTNAME=<MY DOMAIN>
+PEERTUBE_TRUST_PROXY=["127.0.0.1", "loopback", "172.18.0.0/16"]
+PEERTUBE_SMTP_HOSTNAME=postfix
+PEERTUBE_SMTP_PORT=25
+PEERTUBE_SMTP_FROM=noreply@<MY DOMAIN>
+PEERTUBE_SMTP_TLS=false
+PEERTUBE_SMTP_DISABLE_STARTTLS=false
+PEERTUBE_ADMIN_EMAIL=<MY EMAIL ADDRESS>
+POSTFIX_myhostname=<MY DOMAIN>
+OPENDKIM_DOMAINS=<MY DOMAIN>=peertube
+OPENDKIM_RequireSafeKeys=no
+TRAEFIK_ACME_EMAIL=<MY EMAIL ADDRESS>
+TRAEFIK_ACME_DOMAINS=<MY DOMAIN>
+EOT
+
+# Auto-fill .env file
+sed -i -e "s/<MY EMAIL ADDRESS>/$MY_EMAIL_ADDRESS/g" .env
+sed -i -e "s/<MY DOMAIN>/$MY_DOMAIN/g" .env
+sed -i -e "s/<MY POSTGRES USERNAME>/$MY_POSTGRES_USERNAME/g" .env
+sed -i -e "s/<MY POSTGRES PASSWORD>/$MY_POSTGRES_PASSWORD/g" .env
+
+echo $DONE
+
+# If MY_EMAIL_ADDRESS and MY_DOMAIN are not defined edit .env
+if [ -z $MY_EMAIL_ADDRESS ] || [ -z $MY_DOMAIN ]; then
+  echo -n "Edit .env ..."
+  sleep 1
+
+  if has "nano"; then
+    exec nano < /dev/tty "$@" ./.env & wait
+    echo $DONE
+  elif has "vim"; then
+    exec vim < /dev/tty "$@" ./.env & wait
+    echo $DONE
+  elif has "vi"; then
+    exec vi < /dev/tty "$@" ./.env & wait
+    echo $DONE
   else
-    echo >&2 "Get latest environment variables .env"
-    get_latest_file "/docker/.env" ".env.new" || exit 1
-
-    # Make sure new .env is well downloaded with patterns to replace
-    if [ ! -f ./.env.new ]; then
-      echo >&2 "ERROR: Latest .env is missing"
-      exit 1
-    fi
-
-    # Make sure to find all patterns in new .env
-    missing_patterns=0
-    if [ -z "`grep -E -o "<MY EMAIL ADDRESS>" .env.new`" ]; then
-      missing_patterns=1
-      echo >&2 "ERROR: Pattern <MY EMAIL ADDRESS> is missing in latest .env"
-    fi
-    if [ -z "`grep -E -o "<MY DOMAIN>" .env.new`" ]; then
-      missing_patterns=1
-      echo >&2 "ERROR: Pattern <MY DOMAIN> is missing in latest .env"
-    fi
-    if [ -z "`grep -E -o "<MY POSTGRES USERNAME>" .env.new`" ]; then
-      missing_patterns=1
-      echo >&2 "ERROR: Pattern <MY POSTGRES USERNAME> is missing in latest .env"
-    fi
-    if [ -z "`grep -E -o "<MY POSTGRES PASSWORD>" .env.new`" ]; then
-      missing_patterns=1
-      echo >&2 "ERROR: Pattern <MY POSTGRES PASSWORD> is missing in latest .env"
-    fi
-
-    # Exit script if at least one pattern is missing
-    if [ "$missing_patterns" -ne 0 ]; then exit 1; fi
-
-    # Automatic filling new .env
-    # Replace .env variables with MY_EMAIL_ADDRESS, MY_DOMAIN, MY_POSTGRES_USERNAME and MY_POSTGRES_PASSWORD
-    sed -i -e "s/<MY POSTGRES DB>/peertube/g" .env.new
-    if [ ! -z $MY_EMAIL_ADDRESS ]; then
-      sed -i -e "s/<MY EMAIL ADDRESS>/$MY_EMAIL_ADDRESS/g" .env.new
-    fi
-    if [ ! -z $MY_DOMAIN ]; then
-      sed -i -e "s/<MY DOMAIN>/$MY_DOMAIN/g" .env.new
-    fi
-
-    # Get postgres username and password from existing PEERTUBE_DB_USERNAME and PEERTUBE_DB_PASSWORD in .env
-    MY_POSTGRES_USERNAME="`grep -E -o "^PEERTUBE_DB_USERNAME=.*" ./.env | sed -E "s/PEERTUBE_DB_USERNAME=//g"`"
-    MY_POSTGRES_PASSWORD="`grep -E -o "^PEERTUBE_DB_PASSWORD=.*" ./.env | sed -E "s/PEERTUBE_DB_PASSWORD=//g"`"
-
-    # If credentials not found exit script
-    if [ -z "$MY_POSTGRES_USERNAME" ] || [ -z "$MY_POSTGRES_PASSWORD" ]; then
-      echo >&2 "ERROR: PostgreSQL credentials are missing in current .env"
-      exit 1
-    fi
-
-    # Replace them in new .env
-    sed -i -e "s/<MY POSTGRES USERNAME>/$MY_POSTGRES_USERNAME/g" .env.new
-    sed -i -e "s/<MY POSTGRES PASSWORD>/$MY_POSTGRES_PASSWORD/g" .env.new
-
-    # Now everything is ok, overwrite old .env with the new one
-    mv .env.new .env
+    echo "\n$ERROR: missing command-line editor nano, vim or vi"
+    exit 1
   fi
 fi
 
 # Copy traefik config
-if [ ! -f ./docker-volume/traefik/traefik.toml ] || [ ! "$LOCK_COMPOSE_SETUP" ] && [ ! "$LOCK_TRAEFIK_CONFIG" ]; then
-  echo >&2 "Get latest reverse-proxy config docker-volume/traefik/traefik.toml"
-  get_latest_file "/traefik/traefik.toml" "docker-volume/traefik/traefik.toml"
-else
-  echo >&2 "Keep existing reverse-proxy config docker-volume/traefik/traefik.toml"
-fi
+echo "Get latest reverse-proxy traefik config #"
+get_latest_file "/traefik/traefik.toml" "docker-volume/traefik/traefik.toml"
 
 # Copy nginx config
-if [ ! -f ./docker-volume/nginx/peertube ] || [ ! "$LOCK_COMPOSE_SETUP" ] && [ ! "$LOCK_NGINX_SETUP" ]; then
-  echo >&2 "Get latest webserver nginx config docker-volume/nginx/peertube"
-  get_latest_file "/nginx/peertube" "docker-volume/nginx/peertube"
-else
-  echo >&2 "Keep existing webserver nginx config docker-volume/nginx/peertube"
-fi
+echo "Get latest webserver nginx config #"
+get_latest_file "/nginx/peertube" "docker-volume/nginx/peertube"
 
-# Copy Dockerfile.nginx
-if [ ! -f ./Dockerfile.nginx ] || [ ! "$LOCK_COMPOSE_SETUP" ] && [ ! "$LOCK_NGINX_DOCKERFILE" ]; then
-  echo >&2 "Get latest Dockerfile.nginx"
-  get_latest_file "/docker/Dockerfile.nginx" "Dockerfile.nginx"
-else
-  echo >&2 "Keep existing Dockerfile.nginx"
-fi
+# Copy nginx docker
+echo "Get latest nginx docker image #"
+get_latest_file "/docker/Dockerfile.nginx" "Dockerfile.nginx"
+get_latest_file "/docker/entrypoint.nginx.sh" "entrypoint.nginx.sh"
 
-# Copy entrypoint.nginx.sh
-if [ ! -f ./entrypoint.nginx.sh ] || [ ! "$LOCK_COMPOSE_SETUP" ] && [ ! "$LOCK_NGINX_DOCKERFILE" ]; then
-  echo >&2 "Get latest entrypoint.nginx.sh"
-  get_latest_file "/docker/entrypoint.nginx.sh" "entrypoint.nginx.sh"
-else
-  echo >&2 "Keep existing entrypoint.nginx.sh"
-fi
-
-# Copy docker-compose.traefik.yml
-if [ ! -f ./docker-compose.yml ] || [ ! "$LOCK_COMPOSE_SETUP" ] && [ ! "$LOCK_COMPOSE_FILE" ]; then
-  echo >&2 "Get latest docker-compose.traefik.yml"
-  get_latest_file "/docker/docker-compose.traefik.yml" "docker-compose.traefik.yml"
-else
-  echo >&2 "Keep existing docker-compose.traefik.yml"
-fi
-
-# Copy docker-compose.yml
-if [ ! -f ./docker-compose.yml ] || [ ! "$LOCK_COMPOSE_SETUP" ] && [ ! "$LOCK_COMPOSE_FILE" ]; then
-  echo >&2 "Get latest docker-compose.yml"
-  get_latest_file "/docker/docker-compose.yml" "docker-compose.yml"
-else
-  echo >&2 "Keep existing docker-compose.yml"
-fi
+# Copy docker-compose files
+echo "Get latest docker-compose files #"
+get_latest_file "/docker/docker-compose.traefik.yml" "docker-compose.traefik.yml"
+get_latest_file "/docker/docker-compose.yml" "docker-compose.yml"
 
 # chown on workdir
-echo >&2 "Set non-root system user as owner of workdir (chown -R docker:docker $WORKDIR)"
+echo -n "Set non-root system user as owner of workdir (chown -R docker:docker $WORKDIR) ..."
 chown -R docker:docker "$WORKDIR"
+echo $DONE
 
-# Create / Update systemd service
-if [ ! -f $SERVICE_PATH ]; then
-  echo >&2 "Create $SERVICE_PATH"
-else
-  echo >&2 "Update $SERVICE_PATH"
-fi
+# Create / override systemd service
+echo -n "Generate $SERVICE_PATH ..."
+
 cat <<EOT > $SERVICE_PATH
 [Unit]
 Description=PeerTube daemon
@@ -436,123 +402,50 @@ StartLimitBurst=3
 User=docker
 Group=docker
 WorkingDirectory=$WORKDIR
-ExecStart=$COMPOSE -f docker-compose.yml -f docker-compose.traefik.yml up
+ExecStart=$COMPOSE -f docker-compose.yml -f docker-compose.traefik.yml up --build
 ExecStop=$COMPOSE stop peertube
 
 [Install]
 WantedBy=multi-user.target
 EOT
 
-# If MY_EMAIL_ADDRESS and MY_DOMAIN are not defined edit .env
-if [ -z $MY_EMAIL_ADDRESS ] || [ -z $MY_DOMAIN ]; then
-  echo >&2 -n "Edit .env ..."
-  sleep 1
-
-  if has "nano"; then
-    exec nano < /dev/tty "$@" ./.env & wait
-    echo >&2 "${GREEN}done${NC}"
-  elif has "vim"; then
-    exec vim < /dev/tty "$@" ./.env & wait
-    echo >&2 "${GREEN}done${NC}"
-  elif has "vi"; then
-    exec vi < /dev/tty "$@" ./.env & wait
-    echo >&2 "${GREEN}done${NC}"
-  else
-    echo >&2 "${RED}error${NC}"
-    echo >&2 "- missing command-line editor nano, vim or vi"
-  fi
-fi
-
-# Pull docker containers
-echo >&2 "Pull Docker containers"
-$COMPOSE >&2 pull
+echo $DONE
 
 # Enable peertube systemd service
 systemctl >/dev/null 2>&1 dameon-reload # redirect out possible errors
-systemctl >&2 enable peertube
+systemctl enable peertube
 
 # Re-init existing database before starting peertube systemd service
-if [ -f ./docker-volume/db.tar ]; then
-  # Get postgres user
-  POSTGRES_USER="`grep -E -o "^POSTGRES_USER=(.+)" .env | sed -E "s/POSTGRES_USER=//g"`"
-  # Get postgres db
-  POSTGRES_DB="`grep -E -o "^POSTGRES_DB=(.+)" .env | sed -E "s/POSTGRES_DB=//g"`"
-  # Get postgres service name
-  PEERTUBE_DB_HOSTNAME="`grep -E -o "^PEERTUBE_DB_HOSTNAME=(.+)" .env | sed -E "s/PEERTUBE_DB_HOSTNAME=//g"`"
+if [ -f $DB_DUMP ]; then
   # Remove db files
+  echo -n "Remove PosgreSQL mounted volume ..."
   rm -rf ./docker-volume/db
-  sleep 1s
+  echo $DONE
+
   # Up postgres service
-  up_postgres "$PEERTUBE_DB_HOSTNAME"
+  echo "Up PostgreSQL to restore dump #"
+  $CLI postgres:up
+
   # Run restore command
-  echo >&2 -n "Restore existing dump ... "
-  $COMPOSE exec -T $PEERTUBE_DB_HOSTNAME pg_restore -U $POSTGRES_USER -d $POSTGRES_DB < ./docker-volume/db.tar
-  echo >&2 "${GREEN}done${NC}"
-  rm -f ./docker-volume/db.tar
+  echo "Restore PostgreSQL dump #"
+  $CLI postgres:restore $DB_DUMP
+
+  # Clean database archive dump
+  echo -n "Clean PostgreSQL dump ..."
+  rm -f $DB_DUMP
+  echo $DONE
 fi
 
-# Run one time before starting service
-echo >&2 "Start PeerTube service"
-
-# Run compose detached and exit if any errors
-compose_errors=`$($COMPOSE up -d) | grep -i 'ERROR'`
-if [ ! -z "$compose_errors" ]; then
-  exit 1
-fi
-
-# Block stdout until server is up
-echo >&2 -n "Wait until PeerTube server is up ... "
-sleep 50s &
-while [ -z "`$COMPOSE logs --tail=2 peertube | grep -o 'Server listening on'`" ]; do
-  # Break if any stack errors occur
-  # Displays errors and exit
-  stack_errors=`$COMPOSE logs --tail=40 peertube | grep -i 'error'`
-  if [ ! -z "$stack_errors" ]; then
-    echo >&2 $stack_errors
-    exit 1
-  fi
-  # Break after 50s / until pid of "sleep 50s" is destroyed
-  # Display logs and exit
-  if [ -z "`ps -ef | grep $! | grep -o -E 'sleep 50s'`" ]; then
-    $COMPOSE logs --tail=40 peertube
-    exit 1
-  fi
-done
-echo >&2 "${GREEN}done${NC}"
-
-# Start service
+# Compose Up
+echo "\nStart PeerTube #"
+$CLI up
 systemctl start --no-block peertube # be sure start process does not block stdout
 
 # Display Admin Credentials
-echo >&2 ""
-echo >&2 "> PeerTube Admin Credentials <"
-username=`$COMPOSE logs peertube | grep -A1 -E -o "Username: [0-9a-zAZ-Z]*"`
-password=`$COMPOSE logs peertube | grep -A1 -E -o "User password: [0-9a-zAZ-Z]*"`
-
-if [ ! -z "$username" ] && [ ! -z "$password" ]; then
-  echo >&2 $username
-  echo >&2 $password
-# If credentials are not found in compose logs
-else
-  if [ ! -f docker-volume/data/logs/peertube.log ]; then
-    echo >&2 "ERROR: Can't display Admin Credentials, missing docker-volume/data/logs/peertube.log"
-    exit 1
-  else
-    username=`cat docker-volume/data/logs/peertube.log | grep -A1 -E -o "Username: [0-9a-zAZ-Z]*"`
-    password=`cat docker-volume/data/logs/peertube.log | grep -A1 -E -o "User password: [0-9a-zAZ-Z]*"`
-
-    if [ ! -z "$username" ] && [ ! -z "$password" ]; then
-      echo >&2 $username
-      echo >&2 $password
-    else
-      echo >&2 "ERROR: Missing Admin Credentials in logs"
-      exit 1
-    fi
-  fi
-fi
-}
+echo "\nPeerTube Admin Credentials #"
+$CLI show-admin
 
 # Display DKIM DNS TXT Record
-echo >&2 ""
-echo >&2 "> PeerTube DKIM DNS TXT Record <"
-cat ./docker-volume/opendkim/keys/*/*.txt
+echo "\nPeerTube DKIM DNS TXT Record #"
+$CLI show-dkim
+}
