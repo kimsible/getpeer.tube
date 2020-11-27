@@ -94,7 +94,7 @@ To include the backup command in a script without password prompt, you might use
 $ sshpass -p yourpassword rsync -av --exclude docker-volume/db /var/peertube/ username@remote-cloud:<backups-absolute-path>/var/peertube/ --delete
 ```
 
-#### Basic Restore command only for missing files
+#### Basic Restore command only for missing files
 
 ```bash
 $ rsync -av --delete username@remote-cloud:<backups-absolute-path>/var/peertube/ /var/peertube/
