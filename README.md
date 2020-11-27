@@ -233,13 +233,15 @@ On the old server :
 ```bash
 $ peertube postgres:dump /var/peertube/docker-volume/db.tar
 $ peertube down
-$ rsync -av --exclude docker-volume/db /var/peertube/username@new-server:/var/peertube/
+$ rsync -av --exclude docker-volume/db /var/peertube/ username@new-server:/var/peertube/
 ```
+
+**WARNING**: this command could fail with `docker-volume/traefik/acme.json` and `docker-volume/opendkim/keys/peertube.*` if you do not have a root access on the old server, in this case, don't worry, you just need to copy them manually. =)
 
 On the new server :
 ```bash
 $ peertube postgres:up
-$ peertube postgres:restore
+$ peertube postgres:restore /var/peertube/docker-volume/db.tar
 $ systemctl start peertube
 ```
 
