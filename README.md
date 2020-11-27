@@ -4,6 +4,8 @@
 
 This script is based on [the official docker production setup](https://docs.joinpeertube.org/#/install-docker) and runs on most x86-64 linux distributions.
 
+**WARNING: before any upgrade don't forget to backup your peertube installation.**
+
 ### Server requirements
 
 - x86-64 Linux Distribution updated
