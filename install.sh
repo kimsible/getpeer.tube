@@ -402,7 +402,7 @@ StartLimitBurst=3
 User=docker
 Group=docker
 WorkingDirectory=$WORKDIR
-ExecStart=$COMPOSE -f docker-compose.yml -f docker-compose.traefik.yml up --build
+ExecStart=$COMPOSE -f docker-compose.yml -f docker-compose.traefik.yml up
 ExecStop=$COMPOSE stop peertube
 
 [Install]
