@@ -119,7 +119,7 @@ elif [ "$1" = "postgres:dump" ]; then
 
   # Do not restore if PostgreSQL container is down
   if [ -z "$($COMPOSE ps -q $PEERTUBE_DB_HOSTNAME)" ]; then
-    echo "$ERROR: PostgreSQL docker container is down, can't dump. First, you must run `peertube database:start`"
+    echo "$ERROR: PostgreSQL docker container is down, can't dump. First, you must run `peertube postgres:up`"
     exit 1
   fi
 
@@ -142,7 +142,7 @@ elif [ "$1" = "postgres:restore" ]; then
 
   # Do not restore if PostgreSQL container is down
   if [ -z "$($COMPOSE ps -q $PEERTUBE_DB_HOSTNAME)" ]; then
-    echo "$ERROR: PostgreSQL docker container is down, can't restore. First, you must run `peertube database:start`"
+    echo "$ERROR: PostgreSQL docker container is down, can't restore. First, you must run `peertube postgres:up`"
     missing_prerequisites=1
   fi
 
@@ -177,7 +177,7 @@ elif [ "$1" = "postgres:up" ]; then
 elif [ "$1" = "up" ]; then
 
   # Run compose detached and exit if any errors
-  compose_errors=`$($COMPOSE -f docker-compose.yml -f docker-compose.traefik.yml up --build -d) | grep -i 'ERROR'`
+  compose_errors=`$($COMPOSE -f docker-compose.yml -f docker-compose.traefik.yml up -d) | grep -i 'ERROR'`
   if [ ! -z "$compose_errors" ]; then
     exit 1
   fi
