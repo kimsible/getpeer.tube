@@ -204,15 +204,13 @@ elif [ "$1" = "down" ]; then
 
   $COMPOSE down --remove-orphans
 
-fi
+# elif [ "$1" = "upgrade" ]; then
 
-elif [ "$1" = "upgrade" ]; then
-
-  if has "curl"; then
-    sh -c "$(curl -f#L $PEERTUBE_DOCKER_RAW_URL)" >&2
-  elif has "wget"; then
-    sh -c "$(wget -nv $PEERTUBE_DOCKER_RAW_URL -O -)" >&2
-  fi
+#  if has "curl"; then
+#    sh -c "$(curl -f#L $PEERTUBE_DOCKER_RAW_URL)" >&2
+#  elif has "wget"; then
+#    sh -c "$(wget -nv $PEERTUBE_DOCKER_RAW_URL -O -)" >&2
+#  fi
 
 elif [ "$1" = "show-dkim" ]; then
 
