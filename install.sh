@@ -412,7 +412,7 @@ EOT
 echo $DONE
 
 # Enable peertube systemd service
-systemctl >/dev/null 2>&1 dameon-reload # redirect out possible errors
+systemctl >/dev/null 2>&1 daemon-reload # redirect out possible errors
 systemctl enable peertube
 
 # Re-init existing database before starting peertube systemd service
