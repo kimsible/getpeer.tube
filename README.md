@@ -236,7 +236,7 @@ $ peertube down
 $ rsync -av --exclude docker-volume/db /var/peertube/ username@new-server:/var/peertube/
 ```
 
-**WARNING**: this command could fail with `docker-volume/traefik/acme.json` and `docker-volume/opendkim/keys/peertube.*` if you do not have a root access on the old server, in this case, don't worry, you just need to copy them manually. =)
+**WARNING**: this command could fail with `docker-volume/opendkim/keys/peertube.*` if you do not have a root access on the old server, in this case, don't worry, you just need to copy them manually. =)
 
 On the new server :
 ```bash
