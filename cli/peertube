@@ -1,4 +1,4 @@
-#!/usr/bin/env sh
+#!/usr/bin/sh
 
 # Docker Compose binary path
 COMPOSE=/usr/local/bin/docker-compose
@@ -84,6 +84,9 @@ PEERTUBE_DB_HOSTNAME="`grep -E -o "^PEERTUBE_DB_HOSTNAME=(.+)" .env | sed -E "s/
 
 # Get webserver hostname
 PEERTUBE_WEBSERVER_HOSTNAME="`grep -E -o "^PEERTUBE_WEBSERVER_HOSTNAME=(.+)" .env | sed -E "s/PEERTUBE_WEBSERVER_HOSTNAME=//g"`"
+
+# Get admin email
+PEERTUBE_ADMIN_EMAIL="`grep -E -o "^PEERTUBE_ADMIN_EMAIL=(.+)" .env | sed -E "s/PEERTUBE_ADMIN_EMAIL=//g"`"
 
 if [ "$1" = "purge-old-account" ]; then
 
@@ -249,7 +252,17 @@ elif [ "$1" = "show-admin" ]; then
 elif [ "$1" = "generate-ssl-certificate" ]; then
 
   echo "Generate new SSL/TLS certificate using Let's Encrypt #"
-  docker run -it --rm --name certbot -p 80:80 -v "$(pwd)/docker-volume/certbot/conf:/etc/letsencrypt" certbot/certbot certonly --standalone --agree-tos -d $PEERTUBE_WEBSERVER_HOSTNAME
+  docker run -it --rm \
+  --name certbot \
+  -p 80:80 \
+  -v "$(pwd)/docker-volume/certbot/conf:/etc/letsencrypt" \
+  certbot/certbot certonly \
+  --standalone \
+  --domain $PEERTUBE_WEBSERVER_HOSTNAME \
+  --email $PEERTUBE_ADMIN_EMAIL \
+  --no-eff-email \
+  --agree-tos \
+  --non-interactive
   echo 1
 
 else
