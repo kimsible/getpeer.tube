@@ -38,6 +38,7 @@ down
 upgrade
 show-dkim
 show-admin
+generate-ssl-certificate
 "
 
 #################
@@ -202,7 +203,7 @@ elif [ "$1" = "up" ]; then
 
 elif [ "$1" = "down" ]; then
 
-  $COMPOSE down --remove-orphans
+  $COMPOSE down -v --remove-orphans
 
 # elif [ "$1" = "upgrade" ]; then
 
@@ -241,6 +242,12 @@ elif [ "$1" = "show-admin" ]; then
       fi
     fi
   fi
+
+elif [ "$1" = "generate-ssl-certificate" ]; then
+
+  echo "Generate new SSL/TLS certificate using Let's Encrypt #"
+  docker run -it --rm --name certbot -p 80:80 -v "$(pwd)/docker-volume/certbot/conf:/etc/letsencrypt" certbot/certbot certonly --standalone
+  echo 1
 
 else
 
