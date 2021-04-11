@@ -258,15 +258,9 @@ if [ -f .env ] && [ -f docker-compose.yml ]; then
   $CLI down
 fi
 
-# Init docker-volume and traefik directory
-echo -n "Create docker-volume/traefik if non-exists ..."
-mkdir -p docker-volume/traefik
-echo $DONE
-
-# Create traefik acme config
-echo -n "Create docker-volume/traefik/acme.json if non-exists ..."
-touch docker-volume/traefik/acme.json
-chmod 600 docker-volume/traefik/acme.json
+# Init docker-volume and certbot directory
+echo -n "Create docker-volume/certbot if non-exists ..."
+mkdir -p docker-volume/certbot
 echo $DONE
 
 # Init nginx directory
@@ -331,8 +325,6 @@ PEERTUBE_ADMIN_EMAIL=<MY EMAIL ADDRESS>
 POSTFIX_myhostname=<MY DOMAIN>
 OPENDKIM_DOMAINS=<MY DOMAIN>=peertube
 OPENDKIM_RequireSafeKeys=no
-TRAEFIK_ACME_EMAIL=<MY EMAIL ADDRESS>
-TRAEFIK_ACME_DOMAINS=<MY DOMAIN>
 EOT
 
 # Auto-fill .env file
@@ -363,28 +355,23 @@ if [ -z $MY_EMAIL_ADDRESS ] || [ -z $MY_DOMAIN ]; then
   fi
 fi
 
-# Copy traefik config
-echo "Get latest reverse-proxy traefik config #"
-get_latest_file "/traefik/traefik.toml" "docker-volume/traefik/traefik.toml"
-
 # Copy nginx config
 echo "Get latest webserver nginx config #"
 get_latest_file "/nginx/peertube" "docker-volume/nginx/peertube"
 
-# Copy nginx docker
-echo "Get latest nginx docker image #"
-get_latest_file "/docker/Dockerfile.nginx" "Dockerfile.nginx"
-get_latest_file "/docker/entrypoint.nginx.sh" "entrypoint.nginx.sh"
-
 # Copy docker-compose files
-echo "Get latest docker-compose files #"
-get_latest_file "/docker/docker-compose.traefik.yml" "docker-compose.traefik.yml"
+echo "Get latest docker-compose file #"
 get_latest_file "/docker/docker-compose.yml" "docker-compose.yml"
 
 # chown on workdir
 echo -n "Set non-root system user as owner of workdir (chown -R docker:docker $WORKDIR) ..."
 chown -R docker:docker "$WORKDIR"
 echo $DONE
+
+# Generate the first SSL/TLS certificate using Let's Encrypt
+if [ ! -d ./docker-volume/certbot/conf ]; then
+  $CLI generate-ssl-certificate
+fi
 
 # Create / override systemd service
 echo -n "Generate $SERVICE_PATH ..."
@@ -402,7 +389,7 @@ StartLimitBurst=3
 User=docker
 Group=docker
 WorkingDirectory=$WORKDIR
-ExecStart=$COMPOSE -f docker-compose.yml -f docker-compose.traefik.yml up
+ExecStart=$COMPOSE up
 ExecStop=$COMPOSE stop peertube
 
 [Install]
