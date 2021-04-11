@@ -158,7 +158,7 @@ elif [ "$1" = "postgres:restore" ]; then
 
 elif [ "$1" = "postgres:up" ]; then
 
-  $COMPOSE -f docker-compose.yml -f docker-compose.traefik.yml up -d $PEERTUBE_DB_HOSTNAME
+  $COMPOSE up -d $PEERTUBE_DB_HOSTNAME
 
   # Block stdout until database is up
   sleep 10s &
@@ -181,7 +181,7 @@ elif [ "$1" = "postgres:up" ]; then
 elif [ "$1" = "up" ]; then
 
   # Run compose detached and exit if any errors
-  compose_errors=`$($COMPOSE -f docker-compose.yml -f docker-compose.traefik.yml up -d) | grep -i 'ERROR'`
+  compose_errors=`$($COMPOSE up -d) | grep -i 'ERROR'`
   if [ ! -z "$compose_errors" ]; then
     exit 1
   fi

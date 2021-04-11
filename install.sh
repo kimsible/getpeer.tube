@@ -355,6 +355,14 @@ if [ -z $MY_EMAIL_ADDRESS ] || [ -z $MY_DOMAIN ]; then
   fi
 fi
 
+# Copy nginx config
+echo "Get latest webserver nginx config #"
+get_latest_file "/nginx/peertube" "docker-volume/nginx/peertube"
+
+# Copy docker-compose files
+echo "Get latest docker-compose file #"
+get_latest_file "/docker/docker-compose.yml" "docker-compose.yml"
+
 # chown on workdir
 echo -n "Set non-root system user as owner of workdir (chown -R docker:docker $WORKDIR) ..."
 chown -R docker:docker "$WORKDIR"
