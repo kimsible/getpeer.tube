@@ -10,7 +10,7 @@ This script is based on [the official docker production setup](https://docs.join
 
 - x86-64 Linux Distribution updated
 - SSH access **as root** or sudoer user with `sudo` prefix
-- Access on **port 25 (smtp)**, **port 80 (http)** and **port 443 (https)**
+- Access on **port 25 (smtp)**, **port 80 (http)**, **port 443 (https)** and **port 1935 (rtmp)**
 - A Domain Name pointing to this server
 - **[Docker](https://docs.docker.com/install/) >= v17.06**
 
