@@ -22,6 +22,7 @@ parse-log
 create-transcoding-job
 create-import-video-file-job
 prune-storage
+regenerate-thumbnails
 optimize-old-videos
 update-host
 reset-password
