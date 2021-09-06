@@ -4,7 +4,12 @@
 
 This script is based on [the official docker production setup](https://docs.joinpeertube.org/#/install-docker) and runs on most x86-64 linux distributions.
 
-**WARNING: before any upgrade don't forget to backup your peertube installation.**
+**WARNING: before any upgrade don't forget to backup your peertube installation**
+
+
+**DO NOT USE THIS SCRIPT**<br>
+If you've **customized nginx or docker-compose** configuration production files<br>
+Instead prefer editing any file one by one and use the CLI
 
 ### Server requirements
 
