@@ -252,9 +252,6 @@ MY_POSTGRES_PASSWORD=`date +%s | sha256sum | base64 | head -c 32`
 
 echo $DONE
 
-[ -z $MY_EMAIL_ADDRESS ] && echo "$WARNING: MY_EMAIL_ADDRESS is not defined"
-[ -z $MY_DOMAIN ] && echo "$WARNING: MY_DOMAIN is not defined"
-
 # Display used environment variables
 [ ! -z $MY_EMAIL_ADDRESS ] && echo "Using MY_EMAIL_ADDRESS=$MY_EMAIL_ADDRESS $OK"
 [ ! -z $MY_DOMAIN ] && echo "Using MY_DOMAIN=$MY_DOMAIN $OK"
