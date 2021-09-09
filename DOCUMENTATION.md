@@ -11,7 +11,7 @@ This script is also able to upgrade the stack but in production:
 
 - Check if the script is running as root
 - Check if the host works with systemd
-- Check if cURL or Wget are installed
+- Check if cURL is installed
 - Check if **Docker >= v17.06** is installed
 - Stop existing `peertube.service`
 - Install or upgrade Compose binary from GitHub Releases
@@ -28,15 +28,11 @@ This script is also able to upgrade the stack but in production:
 
 ## Use cases
 
-### Basic usage with cURL or Wget
+### Basic usage with cURL
 
 ```shell
 curl https://getpeer.tube | sh
 ```
-```shell
-wget https://getpeer.tube -O - | sh
-```
-
 
 ### Advanced usage with env vars
 
@@ -45,11 +41,8 @@ An upgrade will **auto-fill** environment variables `MY_EMAIL_ADDRESS` and `MY_D
 ```shell
 MY_EMAIL_ADDRESS=me@domain.tld MY_DOMAIN=domain.tld curl https://getpeer.tube | sh
 ```
-```shell
-MY_EMAIL_ADDRESS=me@domain.tld MY_DOMAIN=domain.tld wget https://getpeer.tube -O - | sh
-```
 
-You can also download and run [the script](https://raw.github.com/kimsible/install-peertube/master/install.sh) manually.
+You can also download and run [the script](https://raw.github.com/kimsible/getpeer.tube/master/script/index.sh) manually.
 
 
 
@@ -116,16 +109,12 @@ Simply:
 $ peertube
 ```
 
-Or see https://github.com/kimsible/install-peertube/master/cli/peertube.
+Or see https://github.com/kimsible/getpeer.tube/blob/master/cli/peertube.
 
 ## Development
 
-Basic usage with **cURL** or **Wget**.
 ```shell
-GIT_BRANCH=develop sh -c "$(curl -fsSL https://raw.github.com/kimsible/install-peertube/develop/install.sh)"
-```
-```shell
-GIT_BRANCH=develop sh -c "$(wget https://raw.github.com/kimsible/install-peertube/develop/install.sh -O -)"
+GIT_BRANCH=develop curl https://raw.githubusercontent.com/kimsible/getpeer.tube/master/script/index.sh | sh
 ```
 
 This error occurs if you have already installed peertube in another working directory.

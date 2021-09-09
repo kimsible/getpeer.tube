@@ -63,23 +63,14 @@ has() {
 get_latest_file() {
   remote_path=$1
   local_path=$2
-
-  if has "curl"; then
-    curl -#fL $PEERTUBE_DOCKER_RAW_URL$remote_path -o $local_path 2>&1 || (echo "Request URL: $PEERTUBE_DOCKER_RAW_URL$remote_path" && exit 1)
-  elif has "wget"; then
-    wget -nv $PEERTUBE_DOCKER_RAW_URL$remote_path -O $local_path 2>&1 || (echo "Request URL: $PEERTUBE_DOCKER_RAW_URL$remote_path" && exit 1)
-  fi
+  curl -#fL $PEERTUBE_DOCKER_RAW_URL$remote_path -o $local_path 2>&1 || (echo "Request URL: $PEERTUBE_DOCKER_RAW_URL$remote_path" && exit 1)
 }
 
 # Get docker-compose release from GitHub
 get_docker_compose() {
   release=$1
   download_url="https://github.com/docker/compose/releases/download/$release/docker-compose-`uname -s`-`uname -m`"
-  if has "curl"; then
-    curl -#fL $download_url -o /usr/local/bin/docker-compose 2>&1 || exit 1
-  elif has "wget"; then
-    wget -nv $download_url -O /usr/local/bin/docker-compose 2>&1 || exit 1
-  fi
+  curl -#fL $download_url -o /usr/local/bin/docker-compose 2>&1 || exit 1
   chmod +x /usr/local/bin/docker-compose
 }
 
@@ -87,15 +78,9 @@ get_docker_compose() {
 get_latest_release_name() {
   repo=$1
   api_url="https://api.github.com/repos/$repo/releases/latest"
-  if has "curl"; then
-    curl -sL $api_url |
-      grep '"tag_name":' |         # Get tag line
-      sed -E 's/.*"([^"]+)".*/\1/' # Pluck JSON value
-  elif has "wget"; then
-    wget -qO- $api_url |
-      grep '"tag_name":' |
-      sed -E 's/.*"([^"]+)".*/\1/'
-  fi
+  curl -sL $api_url |
+    grep '"tag_name":' |         # Get tag line
+    sed -E 's/.*"([^"]+)".*/\1/' # Pluck JSON value
 }
 
 get_release_short() {
@@ -172,12 +157,12 @@ else
   echo "- systemd $OK"
 fi
 
-# curl or wget
-if ! has "curl" && ! has "wget"; then
+# curl
+if ! has "curl"; then
   missing_prerequisites=1
-  echo "- $ERROR: curl or wget are required, both are missing"
+  echo "- $ERROR: curl is required"
 else
-  echo "- curl / wget $OK"
+  echo "- curl $OK"
 fi
 
 # docker
