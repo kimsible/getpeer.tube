@@ -1,5 +1,11 @@
 #!/usr/bin/env sh
 
+# This script install PeerTube official docker stack in /var/peertube
+#
+# SHELL command: `curl https://getpeer.tube | sh`
+#
+# Source: https://github.com/kimsible/getpeer.tube
+
 {
 #################
 ### CONSTANTS ###
@@ -11,7 +17,7 @@ if [ ! "$GIT_BRANCH" ]; then
 fi
 
 # Peertube: https raw url of docker production PeerTube setup
-PEERTUBE_DOCKER_RAW_URL=https://raw.githubusercontent.com/kimsible/install-peertube/$GIT_BRANCH
+PEERTUBE_DOCKER_RAW_URL=https://raw.githubusercontent.com/kimsible/getpeer.tube/$GIT_BRANCH
 
 # Docker: needs version matching with v3.3 Compose file format
 # https://docs.docker.com/compose/compose-file/compose-versioning/

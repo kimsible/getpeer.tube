@@ -4,7 +4,7 @@
 COMPOSE=/usr/local/bin/docker-compose
 
 # Peertube: https raw url of docker production PeerTube setup
-PEERTUBE_DOCKER_RAW_URL=https://raw.githubusercontent.com/kimsible/install-peertube/master/install.sh
+PEERTUBE_DOCKER_RAW_URL=https://raw.githubusercontent.com/kimsible/getpeer.tube/master/script/index.sh
 
 # PeerTube Working directory
 WORKDIR=/var/peertube

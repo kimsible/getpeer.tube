@@ -1,11 +1,15 @@
-# Install PeerTube `$_`
+# getpeer.tube
 
 > **Installing** of [PeerTube](https://joinpeertube.org) docker stack by one SHELL command
+
+```shell
+curl https://getpeer.tube | sh
+```
 
 This script builds a PeerTube docker stack for production. It runs on most **x86-64 linux distributions** and brings:
 
 - 📖 [Official docker-compose production setup](https://docs.joinpeertube.org/#/install-docker)
-- 🧰 [Extended PeerTube CLI](https://github.com/kimsible/install-peertube/blob/master/DOCUMENTATION.md#extended-cli)
+- 🧰 [Extended PeerTube CLI](https://github.com/kimsible/getpeer.tube/blob/master/DOCUMENTATION.md#extended-cli)
 
 
 ## Server requirements
@@ -16,12 +20,7 @@ This script builds a PeerTube docker stack for production. It runs on most **x86
 - A Domain Name pointing to this server
 - **[Docker](https://docs.docker.com/install/) >= v17.06**
 
-## Basic usage
-
-```shell
-curl https://getpeer.tube | sh
-```
 
 ## Documentation
 
-See the [Documentation usage](https://github.com/kimsible/install-peertube/blob/master/DOCUMENTATION.md).
+See the [Documentation usage](https://github.com/kimsible/getpeer.tube/blob/master/DOCUMENTATION.md).

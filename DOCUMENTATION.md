@@ -1,4 +1,4 @@
-# How « Install PeerTube » works
+# How getpeer.tube works
 
 ⚠️ **DISCLAIMER ON UPGRADING**<br>
 This script is also able to upgrade the stack but in production:
