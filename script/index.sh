@@ -32,9 +32,6 @@ WORKDIR=/var/peertube
 # PeerTube CLI binary path
 CLI=/usr/sbin/peertube
 
-# PeerTube Archive Dump for upgrade
-DB_DUMP=/tmp/peertube-db-dump.tar
-
 # PeerTube Service Path
 SERVICE_PATH=/etc/systemd/system/peertube.service
 
@@ -160,7 +157,7 @@ fi
 # curl
 if ! has "curl"; then
   missing_prerequisites=1
-  echo "- $ERROR: curl is required"
+  echo "- $ERROR: curl is missing"
 else
   echo "- curl $OK"
 fi
@@ -219,77 +216,44 @@ else
   fi
 fi
 
-# Init workdir
-echo -n "Create workdir $WORKDIR if non-exists ..."
-mkdir -p "$WORKDIR/docker-volume"
-cd "$WORKDIR"
-echo $DONE
-
 # Get latest peertube cli
 echo "Get latest peertube cli #"
 rm -f $CLI
 get_latest_file "/cli/peertube" "$CLI"
 chmod +x $CLI
 
-# Dump existing database to easier migrate if any PostgreSQL version upgrade
-# To proceed, a full Compose setup and a mounted database must exist (docker-volume/db, .env, docker-compose.yml)
-if [ -d docker-volume/db ] && [ -f .env ] && [ -f docker-compose.yml ]; then
-  # Up PostgreSQL container
-  echo "Up PostgreSQL if down #"
-  $CLI postgres:up
-
-  # Dump existing database
-  echo "Dump PostgreSQL to easier migrate #"
-  $CLI postgres:dump $DB_DUMP
+# Check if a stack is alreay installed
+if [ -f $WORKDIR/.env ] || [ -f $WORKDIR/docker-compose.yml ] || [ -f $WORKDIR/docker-volume ]; then
+  echo "A PeerTube docker stack already exists in $WORKDIR - stop upgrading now."
+  exit 1
 fi
 
-# Down all containers to not conflict upgrade
-if [ -f .env ] && [ -f docker-compose.yml ]; then
-  echo "Down all containers to not conflict upgrade #"
-  $CLI down
-fi
+# Init workdir
+echo -n "Create workdir $WORKDIR ..."
+mkdir -p "$WORKDIR/docker-volume"
+cd "$WORKDIR"
+echo $DONE
 
 # Init docker-volume and certbot directory
-echo -n "Create docker-volume/certbot if non-exists ..."
+echo -n "Create docker-volume/certbot ..."
 mkdir -p docker-volume/certbot
 echo $DONE
 
 # Init nginx directory
-echo -n "Create docker-volume/nginx if non-exists ..."
+echo -n "Create docker-volume/nginx ..."
 mkdir -p docker-volume/nginx
 echo $DONE
 
-if [ -f .env ]; then # If .env exists keep existing environment variables
-  echo -n "Get existing PostgreSQL credentials in .env file ..."
-  MY_POSTGRES_USERNAME="`get_env_var 'PEERTUBE_DB_USERNAME'`"
-  MY_POSTGRES_PASSWORD="`get_env_var 'PEERTUBE_DB_PASSWORD'`"
-  echo $DONE
+# Randomize PostgreSQL username and password
+echo -n "Randomize PostgreSQL credentials ..."
 
-  # Exit if PostgreSQL credentials not found
-  if [ -z $MY_POSTGRES_USERNAME ] && [ -z $MY_POSTGRES_PASSWORD ]; then
-    echo "\n$ERROR: PostgreSQL username or password not found in $WORKDIR/.env, can't upgrade"
-    exit 1
-  fi
+MY_POSTGRES_USERNAME="`head /dev/urandom | tr -dc A-Za-z0-9 | head -c 10`"
+MY_POSTGRES_PASSWORD=`date +%s | sha256sum | base64 | head -c 32`
 
-  # Get email and domain
-  echo -n "Get existing email and domain in .env file ..."
-  MY_EMAIL_ADDRESS="`get_env_var 'PEERTUBE_ADMIN_EMAIL'`"
-  MY_DOMAIN="`get_env_var 'PEERTUBE_WEBSERVER_HOSTNAME'`"
-  echo $DONE
+echo $DONE
 
-  [ -z $MY_EMAIL_ADDRESS ] && echo "$WARNING: admin email not found in $WORKDIR/.env"
-  [ -z $MY_DOMAIN ] && echo "$WARNING: domain not found in $WORKDIR/.env"
-else # If not randomize PostgreSQL username and password
-  echo -n "Randomize PostgreSQL credentials ..."
-
-  MY_POSTGRES_USERNAME="`head /dev/urandom | tr -dc A-Za-z0-9 | head -c 10`"
-  MY_POSTGRES_PASSWORD=`date +%s | sha256sum | base64 | head -c 32`
-
-  echo $DONE
-
-  [ -z $MY_EMAIL_ADDRESS ] && echo "$WARNING: MY_EMAIL_ADDRESS is not defined"
-  [ -z $MY_DOMAIN ] && echo "$WARNING: MY_DOMAIN is not defined"
-fi
+[ -z $MY_EMAIL_ADDRESS ] && echo "$WARNING: MY_EMAIL_ADDRESS is not defined"
+[ -z $MY_DOMAIN ] && echo "$WARNING: MY_DOMAIN is not defined"
 
 # Display used environment variables
 [ ! -z $MY_EMAIL_ADDRESS ] && echo "Using MY_EMAIL_ADDRESS=$MY_EMAIL_ADDRESS $OK"
@@ -360,9 +324,7 @@ chown -R docker:docker "$WORKDIR"
 echo $DONE
 
 # Generate the first SSL/TLS certificate using Let's Encrypt
-if [ ! -d ./docker-volume/certbot/conf ]; then
-  $CLI generate-ssl-certificate
-fi
+$CLI generate-ssl-certificate
 
 # Create / override systemd service
 echo -n "Generate $SERVICE_PATH ..."
@@ -392,27 +354,6 @@ echo $DONE
 # Enable peertube systemd service
 systemctl >/dev/null 2>&1 daemon-reload # redirect out possible errors
 systemctl enable peertube
-
-# Re-init existing database before starting peertube systemd service
-if [ -f $DB_DUMP ]; then
-  # Remove db files
-  echo -n "Remove PosgreSQL mounted volume ..."
-  rm -rf ./docker-volume/db
-  echo $DONE
-
-  # Up postgres service
-  echo "Up PostgreSQL to restore dump #"
-  $CLI postgres:up
-
-  # Run restore command
-  echo "Restore PostgreSQL dump #"
-  $CLI postgres:restore $DB_DUMP
-
-  # Clean database archive dump
-  echo -n "Clean PostgreSQL dump ..."
-  rm -f $DB_DUMP
-  echo $DONE
-fi
 
 # Compose Up
 echo "\nStart PeerTube #"
