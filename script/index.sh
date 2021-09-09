@@ -180,7 +180,7 @@ fi
 if [ "$missing_prerequisites" -ne 0 ]; then exit 1; fi
 
 # Docker: make sure a non-root docker user system exists
-echo -n "Create non-root system user (useradd -r -M -g docker docker) if non-exists ..."
+echo -n "Make sure a non-root docker user system exists (useradd -r -M -g docker docker) ..."
 useradd >/dev/null 2>&1 -r -M -g docker docker # redirect out message if user already exists
 echo $DONE
 
