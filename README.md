@@ -16,13 +16,10 @@ This script builds a PeerTube docker stack for production. It runs on most **x86
 - A Domain Name pointing to this server
 - **[Docker](https://docs.docker.com/install/) >= v17.06**
 
-## Basic usage with **cURL** or **Wget**
+## Basic usage
 
 ```shell
-sh -c "$(curl -fsSL https://raw.github.com/kimsible/install-peertube/master/install.sh)"
-```
-```shell
-sh -c "$(wget https://raw.github.com/kimsible/install-peertube/master/install.sh -O -)"
+curl https://getpeer.tube | sh
 ```
 
 ## Documentation

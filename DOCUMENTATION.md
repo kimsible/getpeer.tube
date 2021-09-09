@@ -31,10 +31,10 @@ This script is also able to upgrade the stack but in production:
 ### Basic usage with cURL or Wget
 
 ```shell
-sh -c "$(curl -fsSL https://raw.github.com/kimsible/install-peertube/master/install.sh)"
+curl https://getpeer.tube | sh
 ```
 ```shell
-sh -c "$(wget https://raw.github.com/kimsible/install-peertube/master/install.sh -O -)"
+wget https://getpeer.tube -O - | sh
 ```
 
 
@@ -43,12 +43,10 @@ sh -c "$(wget https://raw.github.com/kimsible/install-peertube/master/install.sh
 An upgrade will **auto-fill** environment variables `MY_EMAIL_ADDRESS` and `MY_DOMAIN` with existing ones. But when install you may want define them:
 
 ```shell
-MY_EMAIL_ADDRESS=me@domain.tld MY_DOMAIN=domain.tld \
-sh -c "$(curl -fsSL https://raw.github.com/kimsible/install-peertube/master/install.sh)"
+MY_EMAIL_ADDRESS=me@domain.tld MY_DOMAIN=domain.tld curl https://getpeer.tube | sh
 ```
 ```shell
-MY_EMAIL_ADDRESS=me@domain.tld MY_DOMAIN=domain.tld \
-sh -c "$(wget https://raw.github.com/kimsible/install-peertube/master/install.sh -O -)"
+MY_EMAIL_ADDRESS=me@domain.tld MY_DOMAIN=domain.tld wget https://getpeer.tube -O - | sh
 ```
 
 You can also download and run [the script](https://raw.github.com/kimsible/install-peertube/master/install.sh) manually.
