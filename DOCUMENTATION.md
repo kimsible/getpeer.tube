@@ -1,26 +1,22 @@
 # How getpeer.tube works
 
-⚠️ **DISCLAIMER ON UPGRADING**<br>
-This script is also able to upgrade the stack but in production:
-
-✋  **DO NOT USE THIS SCRIPT** if you've **customized nginx or docker-compose** configuration files.<br>
-  💡 Instead prefer editing any file one by one and use the CLI.<br>
-  💡 Before any upgrade don't forget to backup your peertube docker stack.
-
 ## Steps
 
 - Check if the script is running as root
 - Check if the host works with systemd
 - Check if cURL is installed
 - Check if **Docker >= v17.06** is installed
-- Stop existing `peertube.service`
 - Install or upgrade Compose binary from GitHub Releases
-- Create working directory `/var/peertube`
 - Create non-root system user owner of working directory
+- Create or upgrade CLI
+
+The next steps are done only if there is not any PeerTube docker stack already installed:
+
+- Create working directory `/var/peertube`
 - Get latest official compose setup of PeerTube stack from GitHub Raw
-  - Generate or use existing PostgreSQL credentials
-  - Use defined `MY_EMAIL_ADDRESS` and `MY_DOMAIN` or wait for editing updated `.env`
-- Create or update `peertube.service`
+  - Generate PostgreSQL credentials
+  - Use defined `MY_EMAIL_ADDRESS` and `MY_DOMAIN` and wait for editing updated `.env`
+- Create `peertube.service`
 - Pull latest images
 - Run `peertube.service`
 - Display **PeerTube Admin Credentials** once server up or error logs
@@ -36,14 +32,13 @@ curl https://getpeer.tube | sh
 
 ### Advanced usage with env vars
 
-An upgrade will **auto-fill** environment variables `MY_EMAIL_ADDRESS` and `MY_DOMAIN` with existing ones. But when install you may want define them:
+You may want to **auto-fill** environment variables `MY_EMAIL_ADDRESS` and `MY_DOMAIN`:
 
 ```shell
 MY_EMAIL_ADDRESS=me@domain.tld MY_DOMAIN=domain.tld curl https://getpeer.tube | sh
 ```
 
 You can also download and run [the script](https://raw.github.com/kimsible/getpeer.tube/master/script/index.sh) manually.
-
 
 
 ## Extended CLI
@@ -102,11 +97,22 @@ $ peertube postgres:restore /var/peertube/docker-volume/db.tar
 $ systemctl start peertube
 ```
 
+### Automatic upgrade
+
+⚠️ **Before any upgrade**<br>
+💡 Don't forget to backup your peertube docker stack.<br>
+💡 Edit any configuration file one by one if required by the release.<br>
+💡 Check breaking changes here: https://github.com/Chocobozzz/PeerTube/releases
+
+```bash
+$ peertube upgrade
+```
+
 ### Command List
 
 Simply:
 ```bash
-$ peertube
+$ peertube # Will display command list
 ```
 
 Or see https://github.com/kimsible/getpeer.tube/blob/master/cli/peertube.

@@ -20,7 +20,6 @@ This script builds a PeerTube docker stack for production. It runs on most **x86
 - A Domain Name pointing to this server
 - **[Docker](https://docs.docker.com/install/) >= v17.06**
 
-
 ## Documentation
 
-See the [Documentation usage](https://github.com/kimsible/getpeer.tube/blob/master/DOCUMENTATION.md).
+See the [Documentation](https://github.com/kimsible/getpeer.tube/blob/master/DOCUMENTATION.md).
