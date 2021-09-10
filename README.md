@@ -8,7 +8,7 @@ curl https://getpeer.tube | sh
 
 This script builds a PeerTube docker stack for production. It runs on most **x86-64 linux distributions** and brings:
 
-- 📖 [Official docker-compose production setup](https://docs.joinpeertube.org/#/install-docker)
+- 📖 [Official docker-compose production setup](https://docs.joinpeertube.org/install-docker)
 - 🧰 [Extended PeerTube CLI](https://github.com/kimsible/getpeer.tube/blob/master/DOCUMENTATION.md#extended-cli)
 
 
