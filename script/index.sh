@@ -138,6 +138,17 @@ validate_email() {
   echo "$1" |grep -P -i '^[a-z0-9]+@[a-z0-9]+\.[a-z]{2}'
 }
 
+prompt() {
+  read -p "What is your $1? " INPUT
+
+  while [ -z "`validate_$1 $INPUT`" ]; do
+    echo "${ERROR}: $INPUT is not a valid $1, please enter a valid one" >&2 # prompt error after failed
+    read -p "What is your $1? " INPUT
+  done
+
+  echo $INPUT
+}
+
 #################
 ##### MAIN ######
 #################
@@ -210,8 +221,22 @@ if [ -f $WORKDIR/.env ] || [ -f $WORKDIR/docker-compose.yml ] || [ -f $WORKDIR/d
   UPGRADE=1
 fi
 
-# Docker: make sure a non-root docker user system exists
 if [ -z "$UPGRADE" ]; then
+  # Prompt $MY_DOMAIN if not defined
+  if [ -z $MY_DOMAIN ]; then
+    MY_DOMAIN=`prompt "domain"`
+  fi
+
+  # Prompt $MY_EMAIL_ADDRESS if not defined
+  if [ -z $MY_EMAIL_ADDRESS ]; then
+    MY_EMAIL_ADDRESS=`prompt "email"`
+  fi
+
+  # Display used environment variables
+  echo "Using MY_EMAIL_ADDRESS=$MY_EMAIL_ADDRESS $OK"
+  echo "Using MY_DOMAIN=$MY_DOMAIN $OK"
+
+  # Docker: make sure a non-root docker user system exists
   echo -n "Make sure a non-root docker user system exists (useradd -r -M -g docker docker) ..."
   useradd >/dev/null 2>&1 -r -M -g docker docker # redirect out message if user already exists
   echo $DONE
@@ -284,10 +309,6 @@ MY_POSTGRES_PASSWORD=`date +%s | sha256sum | base64 | head -c 32`
 
 echo $DONE
 
-# Display used environment variables
-[ ! -z $MY_EMAIL_ADDRESS ] && echo "Using MY_EMAIL_ADDRESS=$MY_EMAIL_ADDRESS $OK"
-[ ! -z $MY_DOMAIN ] && echo "Using MY_DOMAIN=$MY_DOMAIN $OK"
-
 # Create / override .env
 echo -n "Generate .env file ..."
 
@@ -312,32 +333,12 @@ OPENDKIM_RequireSafeKeys=no
 EOT
 
 # Auto-fill .env file
-[ ! -z $MY_EMAIL_ADDRESS ] && sed -i -e "s/<MY EMAIL ADDRESS>/$MY_EMAIL_ADDRESS/g" .env
-[ ! -z $MY_DOMAIN ] && sed -i -e "s/<MY DOMAIN>/$MY_DOMAIN/g" .env
+sed -i -e "s/<MY EMAIL ADDRESS>/$MY_EMAIL_ADDRESS/g" .env
+sed -i -e "s/<MY DOMAIN>/$MY_DOMAIN/g" .env
 sed -i -e "s/<MY POSTGRES USERNAME>/$MY_POSTGRES_USERNAME/g" .env
 sed -i -e "s/<MY POSTGRES PASSWORD>/$MY_POSTGRES_PASSWORD/g" .env
 
 echo $DONE
-
-# If MY_EMAIL_ADDRESS and MY_DOMAIN are not defined edit .env
-if [ -z $MY_EMAIL_ADDRESS ] || [ -z $MY_DOMAIN ]; then
-  echo -n "Edit .env ..."
-  sleep 1
-
-  if has "nano"; then
-    exec nano < /dev/tty "$@" ./.env & wait
-    echo $DONE
-  elif has "vim"; then
-    exec vim < /dev/tty "$@" ./.env & wait
-    echo $DONE
-  elif has "vi"; then
-    exec vi < /dev/tty "$@" ./.env & wait
-    echo $DONE
-  else
-    echo "\n$ERROR: missing command-line editor nano, vim or vi"
-    exit 1
-  fi
-fi
 
 # Copy nginx config
 echo "Get latest webserver nginx config #"
