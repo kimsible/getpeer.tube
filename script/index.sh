@@ -123,11 +123,19 @@ is_update() {
 
 get_current_release() {
   command=$1
-  echo `$command` | grep -o -E "[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}"
+  echo `$command` |grep -o -E "[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}"
 }
 
 get_env_var() {
   echo `grep -E -o "^$1=.*" ./.env | sed -E "s/$1=//g"`
+}
+
+validate_domain() {
+  echo "$1" |grep -P -i '^[a-z0-9]+\.[a-z]{2}'
+}
+
+validate_email() {
+  echo "$1" |grep -P -i '^[a-z0-9]+@[a-z0-9]+\.[a-z]{2}'
 }
 
 #################
@@ -173,6 +181,22 @@ else
     echo "- $ERROR: docker >= $DOCKER_PREREQUISITE_RELEASE is required, found $docker_current_release"
   else
     echo "- docker $OK"
+  fi
+fi
+
+# domain
+if [ ! -z "$MY_DOMAIN" ]; then
+  if [ -z "`validate_domain $MY_DOMAIN`" ]; then
+    missing_prerequisites=1
+    echo "- $ERROR: $MY_DOMAIN is not a valid domain"
+  fi
+fi
+
+# email
+if [ ! -z "$MY_EMAIL_ADDRESS" ]; then
+  if [ -z "`validate_email $MY_EMAIL_ADDRESS`" ]; then
+    missing_prerequisites=1
+    echo "- $ERROR: $MY_EMAIL_ADDRESS is not a valid email"
   fi
 fi
 
