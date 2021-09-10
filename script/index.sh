@@ -203,10 +203,19 @@ fi
 # Exit if not all prerequisites
 if [ "$missing_prerequisites" -ne 0 ]; then exit 1; fi
 
+# Check if a stack is alreay installed
+if [ -f $WORKDIR/.env ] || [ -f $WORKDIR/docker-compose.yml ] || [ -f $WORKDIR/docker-volume ]; then
+  echo "A PeerTube docker stack already exists in $WORKDIR #"
+  echo "- upgrade docker-compose and CLI only"
+  UPGRADE=1
+fi
+
 # Docker: make sure a non-root docker user system exists
-echo -n "Make sure a non-root docker user system exists (useradd -r -M -g docker docker) ..."
-useradd >/dev/null 2>&1 -r -M -g docker docker # redirect out message if user already exists
-echo $DONE
+if [ -z "$UPGRADE" ]; then
+  echo -n "Make sure a non-root docker user system exists (useradd -r -M -g docker docker) ..."
+  useradd >/dev/null 2>&1 -r -M -g docker docker # redirect out message if user already exists
+  echo $DONE
+fi
 
 # Other architectures than x86_64
 if [ -z "`uname -a | grep -o "x86_64"`" ]; then
@@ -246,9 +255,8 @@ rm -f $CLI
 get_latest_file "/cli/peertube" "$CLI"
 chmod +x $CLI
 
-# Check if a stack is alreay installed
-if [ -f $WORKDIR/.env ] || [ -f $WORKDIR/docker-compose.yml ] || [ -f $WORKDIR/docker-volume ]; then
-  echo "A PeerTube docker stack already exists in $WORKDIR - stop upgrading now."
+# Stop here if upgrading docker-compose / CLI
+if [ ! -z "$UPGRADE" ]; then
   exit 1
 fi
 
