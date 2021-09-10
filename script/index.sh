@@ -221,6 +221,21 @@ if [ -f $WORKDIR/.env ] || [ -f $WORKDIR/docker-compose.yml ] || [ -f $WORKDIR/d
   UPGRADE=1
 fi
 
+<<<<<<< HEAD
+=======
+
+# Prompt $MY_DOMAIN if not defined
+if [ -z $MY_DOMAIN ]; then
+  MY_DOMAIN=`prompt "domain"`
+fi
+
+# Prompt $MY_EMAIL_ADDRESS if not defined
+if [ -z $MY_EMAIL_ADDRESS ]; then
+  MY_EMAIL_ADDRESS=`prompt "email"`
+fi
+
+# Docker: make sure a non-root docker user system exists
+>>>>>>> 9c2586e... Add prompt domain/email and remove editing .env
 if [ -z "$UPGRADE" ]; then
   # Prompt $MY_DOMAIN if not defined
   if [ -z $MY_DOMAIN ]; then
