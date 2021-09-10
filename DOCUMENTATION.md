@@ -140,3 +140,21 @@ Magic command to reset all docker containers, images, volumes and networks.
 ```shell
 docker stop $(docker ps -a -q) & wait; docker rm $(docker ps -a -q) & wait; docker rmi $(docker images -a -q); docker volume rm $(docker volume ls -q) & wait; docker network prune -f
 ```
+
+**Uninstall**
+```shell
+systemctl disable peertube # disabled peertube service
+rm /etc/systemd/system/peertube.service # delete peertube service
+
+cd /var/peertube
+docker-compose down -v --remove-orphans # down all containers
+
+docker rmi $(docker images -a -q) # remove all cached images
+docker volume rm $(docker volume ls -q) # remove all cached volumes
+
+docker network prune # remove all unsued networks
+
+rm /usr/sbin/peertube # remove CLI
+
+rm -r /var/peertube #remove peertube stack
+```
