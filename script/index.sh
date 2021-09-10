@@ -142,7 +142,7 @@ prompt() {
   read -p "What is your $1? " INPUT
 
   while [ -z "`validate_$1 $INPUT`" ]; do
-    echo "${ERROR}: $INPUT is not a valid $1, please enter a valid one" >&2 # prompt error after failed
+    echo "${ERROR}: ${ORANGE}$INPUT${NC} is not a valid $1, please enter a valid one" >&2 # prompt error after failed
     read -p "What is your $1? " INPUT
   done
 
@@ -199,7 +199,7 @@ fi
 if [ ! -z "$MY_DOMAIN" ]; then
   if [ -z "`validate_domain $MY_DOMAIN`" ]; then
     missing_prerequisites=1
-    echo "- $ERROR: $MY_DOMAIN is not a valid domain"
+    echo "- $ERROR: ${ORANGE}$MY_DOMAIN${NC} is not a valid domain"
   fi
 fi
 
@@ -207,7 +207,7 @@ fi
 if [ ! -z "$MY_EMAIL_ADDRESS" ]; then
   if [ -z "`validate_email $MY_EMAIL_ADDRESS`" ]; then
     missing_prerequisites=1
-    echo "- $ERROR: $MY_EMAIL_ADDRESS is not a valid email"
+    echo "- $ERROR: ${ORANGE}$MY_EMAIL_ADDRESS${NC} is not a valid email"
   fi
 fi
 
@@ -216,7 +216,7 @@ if [ "$missing_prerequisites" -ne 0 ]; then exit 1; fi
 
 # Check if a stack is alreay installed
 if [ -f $WORKDIR/.env ] || [ -f $WORKDIR/docker-compose.yml ] || [ -f $WORKDIR/docker-volume ]; then
-  echo "A PeerTube docker stack already exists in $WORKDIR #"
+  echo "A PeerTube docker stack already exists in ${ORANGE}$WORKDIR${NC} #"
   echo "- upgrade docker-compose and CLI only"
   UPGRADE=1
 fi
