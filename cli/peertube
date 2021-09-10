@@ -4,17 +4,20 @@
 COMPOSE=/usr/local/bin/docker-compose
 
 # Peertube: https raw url of docker production PeerTube setup
-PEERTUBE_DOCKER_RAW_URL=https://raw.githubusercontent.com/kimsible/getpeer.tube/master/script/index.sh
+PEERTUBE_DOCKER_RAW_URL=https://raw.githubusercontent.com/kimsible/getpeer.tube/master
 
 # PeerTube Working directory
 WORKDIR=/var/peertube
 
 # Colors
+ORANGE='\033[0;33m'
+GREEN='\033[0;32m'
 RED='\033[0;31m'
 NC='\033[0m' # No Color
 
 # Response Type
 ERROR=${RED}ERROR${NC}
+DONE=${GREEN}done${NC}
 
 # SERVER_TOOLS LIST
 SERVER_TOOLS="
@@ -41,15 +44,6 @@ show-dkim
 show-admin
 generate-ssl-certificate
 "
-
-#################
-### FUNCTIONS ###
-#################
-
-# Test if a program is installed
-has() {
-  type "$1" > /dev/null 2>&1
-}
 
 # Limit command to Server Tools List
 if [ -z $1 ] || [ -z "`echo $SERVER_TOOLS | grep -o -w $1`" ]; then
@@ -89,6 +83,130 @@ PEERTUBE_WEBSERVER_HOSTNAME="`grep -E -o "^PEERTUBE_WEBSERVER_HOSTNAME=(.+)" .en
 # Get admin email
 PEERTUBE_ADMIN_EMAIL="`grep -E -o "^PEERTUBE_ADMIN_EMAIL=(.+)" .env | sed -E "s/PEERTUBE_ADMIN_EMAIL=//g"`"
 
+#################
+### FUNCTIONS ###
+#################
+
+# Test if a program is installed
+has() {
+  type "$1" > /dev/null 2>&1
+}
+
+postgres_down() {
+  # Stop and remove PostgreSQL container
+  $COMPOSE rm -f -s -v $PEERTUBE_DB_HOSTNAME
+}
+
+postgres_dump() {
+  if [ -z $1 ]; then
+    echo "Usage:	peertube postgres:dump /PATH/FILENAME.tar"
+    exit 1
+  fi
+
+  # Do not restore if PostgreSQL container is down
+  if [ -z "$($COMPOSE ps -q $PEERTUBE_DB_HOSTNAME)" ]; then
+    echo "$ERROR: PostgreSQL docker container is down, can't dump. First, you must run `peertube postgres:up`"
+    exit 1
+  fi
+
+  # Dump PostgreSQL database
+  $COMPOSE exec -T $PEERTUBE_DB_HOSTNAME pg_dump -U $POSTGRES_USER -Ft $POSTGRES_DB > $1
+}
+
+postgres_restore() {
+  if [ -z $1 ]; then
+    echo "Usage:	peertube postgres:restore /PATH/FILENAME.tar"
+    exit 1
+  fi
+
+  missing_prerequisites=0
+
+  if [ ! -f "$1" ]; then
+    echo "$ERROR: Database dump archive `$1` not found, can't restore."
+    missing_prerequisites=1
+  fi
+
+  # Do not restore if PostgreSQL container is down
+  if [ -z "$($COMPOSE ps -q $PEERTUBE_DB_HOSTNAME)" ]; then
+    echo "$ERROR: PostgreSQL docker container is down, can't restore. First, you must run `peertube postgres:up`"
+    missing_prerequisites=1
+  fi
+
+  # Exit if not all prerequisites
+  if [ "$missing_prerequisites" -ne 0 ]; then exit 1; fi
+
+  # Run restore command
+  $COMPOSE exec -T $PEERTUBE_DB_HOSTNAME pg_restore -U $POSTGRES_USER -d $POSTGRES_DB < $1
+}
+
+postgres_up() {
+  $COMPOSE up -d $PEERTUBE_DB_HOSTNAME
+
+  # Block stdout until database is up
+  sleep 10s &
+  while [ -z "`$COMPOSE logs --tail=2 $PEERTUBE_DB_HOSTNAME | grep -o 'database system is ready to accept connections'`" ]; do
+    # Break if any database errors occur
+    # Displays errors and exit
+    db_errors=`$COMPOSE logs --tail=40 $PEERTUBE_DB_HOSTNAME | grep -i 'error'`
+    if [ ! -z "$db_errors" ]; then
+      echo $db_errors
+      exit 1
+    fi
+    # Break after 10s / until pid of "sleep 10s" is destroyed
+    # Display logs and exit
+    if [ -z "`ps -ef | grep $! | grep -o -E 'sleep 10s'`" ]; then
+      $COMPOSE logs --tail=40 $PEERTUBE_DB_HOSTNAME
+      exit 1
+    fi
+  done
+}
+
+stack_up() {
+   # Run compose detached and exit if any errors
+  compose_errors=`$($COMPOSE up -d) | grep -i 'ERROR'`
+  if [ ! -z "$compose_errors" ]; then
+    exit 1
+  fi
+
+  # Block stdout until server is up
+  sleep 50s &
+  while [ -z "`$COMPOSE logs --tail=2 peertube | grep -o 'Server listening on'`" ]; do
+    # Break if any stack errors occur
+    # Displays errors and exit
+    stack_errors=`$COMPOSE logs --tail=40 peertube | grep -i 'error'`
+    if [ ! -z "$stack_errors" ]; then
+      echo $stack_errors
+      exit 1
+    fi
+    # Break after 50s / until pid of "sleep 50s" is destroyed
+    # Display logs and exit
+    if [ -z "`ps -ef | grep $! | grep -o -E 'sleep 50s'`" ]; then
+      $COMPOSE logs --tail=40 peertube
+      exit 1
+    fi
+  done
+}
+
+stack_down() {
+  $COMPOSE down -v --remove-orphans
+}
+
+generate_ssl_certificate() {
+  echo "Generate new SSL/TLS certificate using Let's Encrypt #"
+  docker run -it --rm \
+  --name certbot \
+  -p 80:80 \
+  -v "$(pwd)/docker-volume/certbot/conf:/etc/letsencrypt" \
+  certbot/certbot certonly \
+  --standalone \
+  --domain $PEERTUBE_WEBSERVER_HOSTNAME \
+  --email $PEERTUBE_ADMIN_EMAIL \
+  --no-eff-email \
+  --agree-tos \
+  --non-interactive
+  echo 1
+}
+
 if [ "$1" = "purge-old-account" ]; then
 
   username=$2
@@ -115,110 +233,95 @@ elif [ "$1" = "psql" ]; then
 
 elif [ "$1" = "postgres:down" ]; then
 
-  # Stop and remove PostgreSQL container
-  $COMPOSE rm -f -s -v $PEERTUBE_DB_HOSTNAME
+  posgres_down
 
 elif [ "$1" = "postgres:dump" ]; then
 
-  if [ -z $2 ]; then
-    echo "Usage:	peertube postgres:dump /PATH/FILENAME.tar"
-    exit 1
-  fi
-
-  # Do not restore if PostgreSQL container is down
-  if [ -z "$($COMPOSE ps -q $PEERTUBE_DB_HOSTNAME)" ]; then
-    echo "$ERROR: PostgreSQL docker container is down, can't dump. First, you must run `peertube postgres:up`"
-    exit 1
-  fi
-
-  # Dump PostgreSQL database
-  $COMPOSE exec -T $PEERTUBE_DB_HOSTNAME pg_dump -U $POSTGRES_USER -Ft $POSTGRES_DB > $2
+  postgres_dump $2
 
 elif [ "$1" = "postgres:restore" ]; then
 
-  if [ -z $2 ]; then
-    echo "Usage:	peertube postgres:restore /PATH/FILENAME.tar"
-    exit 1
-  fi
-
-  missing_prerequisites=0
-
-  if [ ! -f "$2" ]; then
-    echo "$ERROR: Database dump archive `$2` not found, can't restore."
-    missing_prerequisites=1
-  fi
-
-  # Do not restore if PostgreSQL container is down
-  if [ -z "$($COMPOSE ps -q $PEERTUBE_DB_HOSTNAME)" ]; then
-    echo "$ERROR: PostgreSQL docker container is down, can't restore. First, you must run `peertube postgres:up`"
-    missing_prerequisites=1
-  fi
-
-  # Exit if not all prerequisites
-  if [ "$missing_prerequisites" -ne 0 ]; then exit 1; fi
-
-  # Run restore command
-  $COMPOSE exec -T $PEERTUBE_DB_HOSTNAME pg_restore -U $POSTGRES_USER -d $POSTGRES_DB < $2
+  posgres_restore $2
 
 elif [ "$1" = "postgres:up" ]; then
 
-  $COMPOSE up -d $PEERTUBE_DB_HOSTNAME
-
-  # Block stdout until database is up
-  sleep 10s &
-  while [ -z "`$COMPOSE logs --tail=2 $PEERTUBE_DB_HOSTNAME | grep -o 'database system is ready to accept connections'`" ]; do
-    # Break if any database errors occur
-    # Displays errors and exit
-    db_errors=`$COMPOSE logs --tail=40 $PEERTUBE_DB_HOSTNAME | grep -i 'error'`
-    if [ ! -z "$db_errors" ]; then
-      echo $db_errors
-      exit 1
-    fi
-    # Break after 10s / until pid of "sleep 10s" is destroyed
-    # Display logs and exit
-    if [ -z "`ps -ef | grep $! | grep -o -E 'sleep 10s'`" ]; then
-      $COMPOSE logs --tail=40 $PEERTUBE_DB_HOSTNAME
-      exit 1
-    fi
-  done
+  posgres_up
 
 elif [ "$1" = "up" ]; then
 
-  # Run compose detached and exit if any errors
-  compose_errors=`$($COMPOSE up -d) | grep -i 'ERROR'`
-  if [ ! -z "$compose_errors" ]; then
-    exit 1
-  fi
-
-  # Block stdout until server is up
-  sleep 50s &
-  while [ -z "`$COMPOSE logs --tail=2 peertube | grep -o 'Server listening on'`" ]; do
-    # Break if any stack errors occur
-    # Displays errors and exit
-    stack_errors=`$COMPOSE logs --tail=40 peertube | grep -i 'error'`
-    if [ ! -z "$stack_errors" ]; then
-      echo $stack_errors
-      exit 1
-    fi
-    # Break after 50s / until pid of "sleep 50s" is destroyed
-    # Display logs and exit
-    if [ -z "`ps -ef | grep $! | grep -o -E 'sleep 50s'`" ]; then
-      $COMPOSE logs --tail=40 peertube
-      exit 1
-    fi
-  done
+  stack_up
 
 elif [ "$1" = "down" ]; then
 
-  $COMPOSE down -v --remove-orphans
+  stack_down
 
-# elif [ "$1" = "upgrade" ]; then
+elif [ "$1" = "upgrade" ]; then
 
-#  if has "curl"; then
-#    sh -c "$(curl -f#L $PEERTUBE_DOCKER_RAW_URL)" >&2
-#  elif has "wget"; then
-#    sh -c "$(wget -nv $PEERTUBE_DOCKER_RAW_URL -O -)" >&2
-#  fi
+  echo "${ORANGE}WARNING BEFORE ANY UPGRADE${NC}:"
+  echo "- Don't forget to backup $WORKDIR"
+  echo "- Be sure to edit/merge any new configuration files"
+  echo "  See breaking changes here: https://github.com/Chocobozzz/PeerTube/releases"
+  echo "\n"
+  echo "This script will automatically:"
+  echo "- update docker-commpose and current CLI"
+  echo "- down docker stack"
+  echo "- export the database"
+  echo "- pull latest images"
+  echo "- re-import database"
+  echo "- re-generate SSL certificates"
+  echo "- re-up docker stack"
+  echo "\n"
+
+  read -p "Continue (y/N)?" CONT
+
+  if [ "$CONT" = "y" ]; then
+    # Upgrade docker-compose and current CLI
+    echo "Upgrade docker-compose and current CLI #"
+    sh -c "$(curl -f#L $PEERTUBE_DOCKER_RAW_URL/script/index.sh)" >&2
+
+    # PeerTube Archive Dump for upgrade
+    DB_DUMP=/tmp/peertube-db-dump.tar
+
+    # Down all containers to not conflict upgrade
+    echo "Down all containers to not conflict upgrade #"
+    stack_down
+
+    # Dump existing database to easier migrate if any PostgreSQL version upgrade
+    # Re-Up PostgreSQL container
+    echo "Re-Up PostgreSQL only #"
+    postgres_up
+
+    # Dump existing database
+    echo "Dump PostgreSQL to easier migrate #"
+    postgres_dump $DB_DUMP
+
+    # Re-init existing database
+    # Remove db files
+    echo -n "Remove PosgreSQL mounted volume ..."
+    rm -rf ./docker-volume/db
+    echo $DONE
+
+    # Up postgres service
+    echo "Up PostgreSQL to restore dump #"
+    postgres_up
+
+    # Run restore command
+    echo "Restore PostgreSQL dump #"
+    postgres_restore $DB_DUMP
+
+    # Clean database archive dump
+    echo -n "Clean PostgreSQL dump ..."
+    rm -f $DB_DUMP
+    echo $DONE
+
+    # Re-generate SSL/TLS certificate using Let's Encrypt
+    echo "Re-generate SSL/TLS certificate #"
+    generate_ssl_certificate
+
+    # Re-start stack
+    echo "Re-up all containers #"
+    stack_up
+  fi
 
 elif [ "$1" = "show-dkim" ]; then
 
@@ -252,19 +355,7 @@ elif [ "$1" = "show-admin" ]; then
 
 elif [ "$1" = "generate-ssl-certificate" ]; then
 
-  echo "Generate new SSL/TLS certificate using Let's Encrypt #"
-  docker run -it --rm \
-  --name certbot \
-  -p 80:80 \
-  -v "$(pwd)/docker-volume/certbot/conf:/etc/letsencrypt" \
-  certbot/certbot certonly \
-  --standalone \
-  --domain $PEERTUBE_WEBSERVER_HOSTNAME \
-  --email $PEERTUBE_ADMIN_EMAIL \
-  --no-eff-email \
-  --agree-tos \
-  --non-interactive
-  echo 1
+  generate_ssl_certificate
 
 else
 
