@@ -257,6 +257,14 @@ elif [ "$1" = "down" ]; then
 
 elif [ "$1" = "upgrade" ]; then
 
+  # root
+  uid=`id -u`
+  if [ "$uid" -ne 0 ]; then
+    echo "$ERROR: this script must be run as root or as a sudoer user with sudo"
+    exit 1
+  fi
+
+  echo "\n"
   echo "${ORANGE}WARNING BEFORE ANY UPGRADE${NC}:"
   echo "- Don't forget to backup $WORKDIR"
   echo "- Be sure to edit/merge any new configuration files"
