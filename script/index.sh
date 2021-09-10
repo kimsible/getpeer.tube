@@ -1,6 +1,6 @@
 #!/usr/bin/env sh
 
-# This script install PeerTube official docker stack in /var/peertube
+# This script builds PeerTube official docker stack in /var/peertube
 #
 # SHELL command: `curl https://getpeer.tube | sh`
 #
