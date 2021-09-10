@@ -204,7 +204,6 @@ generate_ssl_certificate() {
   --no-eff-email \
   --agree-tos \
   --non-interactive
-  echo 1
 }
 
 if [ "$1" = "purge-old-account" ]; then
