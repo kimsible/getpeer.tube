@@ -280,8 +280,8 @@ OPENDKIM_RequireSafeKeys=no
 EOT
 
 # Auto-fill .env file
-sed -i -e "s/<MY EMAIL ADDRESS>/$MY_EMAIL_ADDRESS/g" .env
-sed -i -e "s/<MY DOMAIN>/$MY_DOMAIN/g" .env
+[ ! -z $MY_EMAIL_ADDRESS ] && sed -i -e "s/<MY EMAIL ADDRESS>/$MY_EMAIL_ADDRESS/g" .env
+[ ! -z $MY_DOMAIN ] && sed -i -e "s/<MY DOMAIN>/$MY_DOMAIN/g" .env
 sed -i -e "s/<MY POSTGRES USERNAME>/$MY_POSTGRES_USERNAME/g" .env
 sed -i -e "s/<MY POSTGRES PASSWORD>/$MY_POSTGRES_PASSWORD/g" .env
 
