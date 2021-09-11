@@ -295,6 +295,7 @@ echo $DONE
 
 # Stop here if upgrading docker-compose / CLI
 if [ ! -z "$UPGRADE" ]; then
+  echo "\n${GREEN}Docker Compose and the CLI are now successfully upgraded!${NC}\n"
   exit 1
 fi
 
