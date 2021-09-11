@@ -368,7 +368,8 @@ echo -n "Set non-root system user as owner of workdir (chown -R docker:docker $W
 chown -R docker:docker "$WORKDIR"
 echo $DONE
 
-# Generate the first SSL/TLS certificate using Let's Encrypt
+# Generate the first SSL certificate using Let's Encrypt
+echo "Generate SSL certificate using Let's Encrypt \\"
 $CLI generate-ssl-certificate
 
 # Create / override systemd service
