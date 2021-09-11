@@ -56,26 +56,30 @@ has() {
   type "$1" > /dev/null 2>&1
 }
 
+curlf() {
+  STATUSCODE=`curl -sSL --write-out "%{http_code}" $1 -o $2`
+  [ "$STATUSCODE" -ne 200 ] && echo $ERROR && echo "${ORANGE}HTTP $STATUSCODE${NC} ${RED}$1${NC}" && exit 1
+}
+
 # Get latest file from GitHub raw
 get_latest_file() {
   remote_path=$1
   local_path=$2
-  curl -#fL $PEERTUBE_DOCKER_RAW_URL$remote_path -o $local_path 2>&1 || (echo "Request URL: $PEERTUBE_DOCKER_RAW_URL$remote_path" && exit 1)
+  curlf "$PEERTUBE_DOCKER_RAW_URL$remote_path" "$local_path"
 }
 
 # Get docker-compose release from GitHub
 get_docker_compose() {
   release=$1
   download_url="https://github.com/docker/compose/releases/download/$release/docker-compose-`uname -s`-`uname -m`"
-  curl -#fL $download_url -o /usr/local/bin/docker-compose 2>&1 || exit 1
-  chmod +x /usr/local/bin/docker-compose
+  curlf "$download_url" "$COMPOSE"
 }
 
 # Get latest release name from GitHub api
 get_latest_release_name() {
   repo=$1
   api_url="https://api.github.com/repos/$repo/releases/latest"
-  curl -sL $api_url |
+  curl -sfL $api_url |
     grep '"tag_name":' |         # Get tag line
     sed -E 's/.*"([^"]+)".*/\1/' # Pluck JSON value
 }
@@ -153,45 +157,45 @@ prompt() {
 ##### MAIN ######
 #################
 
-echo "Prerequisites #"
+echo "Prerequisites \\"
 missing_prerequisites=0
 
 # root
 uid=`id -u`
 if [ "$uid" -ne 0 ]; then
   missing_prerequisites=1
-  echo "- $ERROR: this script must be run as root or as a sudoer user with sudo"
+  echo " $ERROR: this script must be run as root or as a sudoer user with sudo"
 else
-  echo "- root $OK"
+  echo " root $OK"
 fi
 
 # systemd
 if ! has "systemctl"; then
   missing_prerequisites=1
-  echo "- $ERROR:systemd is missing"
+  echo " $ERROR:systemd is missing"
 else
-  echo "- systemd $OK"
+  echo " systemd $OK"
 fi
 
 # curl
 if ! has "curl"; then
   missing_prerequisites=1
-  echo "- $ERROR: curl is missing"
+  echo " $ERROR: curl is missing"
 else
-  echo "- curl $OK"
+  echo " curl $OK"
 fi
 
 # docker
 if ! has "docker"; then
   missing_prerequisites=1
-  echo "- $ERROR: docker >= $DOCKER_PREREQUISITE_RELEASE is missing"
+  echo " $ERROR: docker >= $DOCKER_PREREQUISITE_RELEASE is missing"
 else
   docker_current_release=`get_current_release "docker -v"`
   if ! is_update "$docker_current_release" "$DOCKER_PREREQUISITE_RELEASE"; then
     missing_prerequisites=1
-    echo "- $ERROR: docker >= $DOCKER_PREREQUISITE_RELEASE is required, found $docker_current_release"
+    echo " $ERROR: docker >= $DOCKER_PREREQUISITE_RELEASE is required, found $docker_current_release"
   else
-    echo "- docker $OK"
+    echo " docker $OK"
   fi
 fi
 
@@ -199,7 +203,7 @@ fi
 if [ ! -z "$MY_DOMAIN" ]; then
   if [ -z "`validate_domain $MY_DOMAIN`" ]; then
     missing_prerequisites=1
-    echo "- $ERROR: ${ORANGE}$MY_DOMAIN${NC} is not a valid domain"
+    echo " $ERROR: ${ORANGE}$MY_DOMAIN${NC} is not a valid domain"
   fi
 fi
 
@@ -207,7 +211,7 @@ fi
 if [ ! -z "$MY_EMAIL_ADDRESS" ]; then
   if [ -z "`validate_email $MY_EMAIL_ADDRESS`" ]; then
     missing_prerequisites=1
-    echo "- $ERROR: ${ORANGE}$MY_EMAIL_ADDRESS${NC} is not a valid email"
+    echo " $ERROR: ${ORANGE}$MY_EMAIL_ADDRESS${NC} is not a valid email"
   fi
 fi
 
@@ -216,26 +220,12 @@ if [ "$missing_prerequisites" -ne 0 ]; then exit 1; fi
 
 # Check if a stack is alreay installed
 if [ -f $WORKDIR/.env ] || [ -f $WORKDIR/docker-compose.yml ] || [ -f $WORKDIR/docker-volume ]; then
-  echo "A PeerTube docker stack already exists in ${ORANGE}$WORKDIR${NC} #"
-  echo "- upgrade docker-compose and CLI only"
+  echo "${ORANGE}Docker stack already exists in $WORKDIR${NC}"
+  echo " → ${GREEN}upgrade Compose and CLI only${NC}"
   UPGRADE=1
 fi
 
-<<<<<<< HEAD
-=======
-
-# Prompt $MY_DOMAIN if not defined
-if [ -z $MY_DOMAIN ]; then
-  MY_DOMAIN=`prompt "domain"`
-fi
-
-# Prompt $MY_EMAIL_ADDRESS if not defined
-if [ -z $MY_EMAIL_ADDRESS ]; then
-  MY_EMAIL_ADDRESS=`prompt "email"`
-fi
-
-# Docker: make sure a non-root docker user system exists
->>>>>>> 9c2586e... Add prompt domain/email and remove editing .env
+# No need to prompt domain/email and create docker user when upgrading
 if [ -z "$UPGRADE" ]; then
   # Prompt $MY_DOMAIN if not defined
   if [ -z $MY_DOMAIN ]; then
@@ -248,11 +238,11 @@ if [ -z "$UPGRADE" ]; then
   fi
 
   # Display used environment variables
-  echo "Using MY_EMAIL_ADDRESS=$MY_EMAIL_ADDRESS $OK"
-  echo "Using MY_DOMAIN=$MY_DOMAIN $OK"
+  echo "${ORANGE}Admin email${NC} → using ${GREEN}$MY_EMAIL_ADDRESS${NC}"
+  echo "${ORANGE}Domain name${NC} → using ${GREEN}$MY_DOMAIN${NC}"
 
   # Docker: make sure a non-root docker user system exists
-  echo -n "Make sure a non-root docker user system exists (useradd -r -M -g docker docker) ..."
+  echo -n "Creating a non-root docker user system ... "
   useradd >/dev/null 2>&1 -r -M -g docker docker # redirect out message if user already exists
   echo $DONE
 fi
@@ -266,34 +256,42 @@ if [ -z "`uname -a | grep -o "x86_64"`" ]; then
     exit 1
   else
     compose_current_release=`get_current_release "$COMPOSE -v"`
-    echo "Using system docker-compose, found version $compose_current_release"
+    echo " ${ORANGE}Found version $compose_current_release${NC}"
+    echo " → ${GREEN}using system docker-compose${NC}"
   fi
 else
   # Install or upgrade docker-compose
-  echo -n "Check latest release of Compose on GitHub Releases ..."
+  echo -n "Checking latest release of Compose     ... "
   compose_latest_release=`get_latest_release_name "docker/compose"`
+  [ -z "$compose_latest_release" ] && echo "${RED}Cannot resolve GitHub releases URL${NC}" && exit 1
   echo $DONE
 
   if ! has "$COMPOSE"; then
-    echo "Install Docker Compose $compose_latest_release #"
+    echo -n "Installing Docker Compose $compose_latest_release       ... "
     get_docker_compose "$compose_latest_release"
+    echo $DONE
+    echo " → into ${ORANGE}$COMPOSE${NC}"
   else
     compose_current_release=`get_current_release "$COMPOSE -v"`
 
     if ! is_update "$compose_current_release" "$compose_latest_release"; then
-      echo "Upgrade Docker Compose from "$compose_current_release" to $compose_latest_release #"
+      echo -n "Upgrading Docker Compose               ... "
       get_docker_compose "$compose_latest_release"
+      echo $DONE
+      echo " → from $compose_current_release to $compose_latest_release"
     else
-      echo "Nothing to update, using docker-compose found version $compose_current_release"
+      echo "${ORANGE}Nothing to update${NC}"
+      echo " → ${GREEN}using docker-compose current version $compose_current_release${NC}"
     fi
   fi
 fi
 
 # Get latest peertube cli
-echo "Get latest peertube cli #"
+echo -n "Installing CLI into ${ORANGE}$CLI${NC} ... "
 rm -f $CLI
 get_latest_file "/cli/peertube" "$CLI"
 chmod +x $CLI
+echo $DONE
 
 # Stop here if upgrading docker-compose / CLI
 if [ ! -z "$UPGRADE" ]; then
@@ -301,23 +299,15 @@ if [ ! -z "$UPGRADE" ]; then
 fi
 
 # Init workdir
-echo -n "Create workdir $WORKDIR ..."
+echo -n "Creating ${ORANGE}$WORKDIR${NC}                 ... "
 mkdir -p "$WORKDIR/docker-volume"
 cd "$WORKDIR"
-echo $DONE
-
-# Init docker-volume and certbot directory
-echo -n "Create docker-volume/certbot ..."
-mkdir -p docker-volume/certbot
-echo $DONE
-
-# Init nginx directory
-echo -n "Create docker-volume/nginx ..."
-mkdir -p docker-volume/nginx
+mkdir -p docker-volume/certbot # Init docker-volume and certbot directory
+mkdir -p docker-volume/nginx # Init nginx directory
 echo $DONE
 
 # Randomize PostgreSQL username and password
-echo -n "Randomize PostgreSQL credentials ..."
+echo -n "Generating PostgreSQL credentials      ... "
 
 MY_POSTGRES_USERNAME="`head /dev/urandom | tr -dc A-Za-z0-9 | head -c 10`"
 MY_POSTGRES_PASSWORD=`date +%s | sha256sum | base64 | head -c 32`
@@ -325,7 +315,7 @@ MY_POSTGRES_PASSWORD=`date +%s | sha256sum | base64 | head -c 32`
 echo $DONE
 
 # Create / override .env
-echo -n "Generate .env file ..."
+echo -n "Generating ${ORANGE}$WORKDIR/.env${NC}          ... "
 
 cat <<EOT > .env
 POSTGRES_USER=<MY POSTGRES USERNAME>
@@ -356,24 +346,26 @@ sed -i -e "s/<MY POSTGRES PASSWORD>/$MY_POSTGRES_PASSWORD/g" .env
 echo $DONE
 
 # Copy nginx config
-echo "Get latest webserver nginx config #"
+echo -n "Installing latest ${ORANGE}nginx${NC} config         ... "
 get_latest_file "/nginx/peertube" "docker-volume/nginx/peertube"
+echo $DONE
 
 # Copy docker-compose files
-echo "Get latest docker-compose file #"
+echo -n "Installing latest ${ORANGE}compose${NC} file         ... "
 get_latest_file "/docker/docker-compose.yml" "docker-compose.yml"
+echo $DONE
 
 # chown on workdir
-echo -n "Set non-root system user as owner of workdir (chown -R docker:docker $WORKDIR) ..."
+echo -n "Assigning $WORKDIR ownership      ... "
 chown -R docker:docker "$WORKDIR"
 echo $DONE
 
 # Generate the first SSL certificate using Let's Encrypt
-echo "Generate SSL certificate using Let's Encrypt \\"
+echo "Generating SSL certificate using Let's Encrypt \\"
 $CLI generate-ssl-certificate
 
 # Create / override systemd service
-echo -n "Generate $SERVICE_PATH ..."
+echo -n "Generating ${ORANGE}$SERVICE_PATH${NC} ... "
 
 cat <<EOT > $SERVICE_PATH
 [Unit]
@@ -398,27 +390,42 @@ EOT
 echo $DONE
 
 # Enable peertube systemd service
+echo -n "Enabling PeerTube systemd service               ... "
 systemctl >/dev/null 2>&1 daemon-reload # redirect out possible errors
 systemctl enable peertube
+echo $DONE
 
 # Compose pull
-echo "Pull docker images \\"
+echo "Pulling docker images \\"
 $COMPOSE pull
 
 # Compose Up
-<<<<<<< HEAD
-echo "\nStart PeerTube #"
-=======
 echo "Up docker stack \\"
->>>>>>> 4a65375... Fix: pull manually to avoid error with up + wrong postgres name function
 $CLI up
 systemctl start --no-block peertube # be sure start process does not block stdout
 
-# Display Admin Credentials
-echo "\nPeerTube Admin Credentials #"
-$CLI show-admin
+# Success message
+cat <<EOF
+                      ______                           _______         _
+                 _   (_____ \                         (_______)       | |
+  ____  _____  _| |_  _____) ) _____  _____   ____        _     _   _ | |__   _____
+ / _  || ___ |(_   _)|  ____/ | ___ || ___ | / ___)      | |   | | | ||  _ \ | ___ |
+( (_| || ____|  | |_ | |      | ____|| ____|| |     _    | |   | |_| || |_) )| ____|
+ \___ ||_____)   \__)|_|      |_____)|_____)|_|    (_)   |_|   |____/ |____/ |_____)
+(_____|
 
-# Display DKIM DNS TXT Record
-echo "\nPeerTube DKIM DNS TXT Record #"
-$CLI show-dkim
+EOF
+
+echo "${GREEN}The PeerTube docker stack is now successfully installed!${NC}"
+
+cat <<EOF
+
+Get your admin credencials and DKIM DNS TXT Record with:
+
+EOF
+
+echo "  ${ORANGE}$ peertube show-admin${NC}"
+echo "  ${ORANGE}$ peertube show-dkim${NC}"
+
+echo ""
 }

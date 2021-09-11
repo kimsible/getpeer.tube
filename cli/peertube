@@ -92,6 +92,18 @@ has() {
   type "$1" > /dev/null 2>&1
 }
 
+curlf() {
+  CURL_OUTPUT=`curl -sfSL --write-out "%{http_code}" $1`
+  isHTTPCode=`echo $CURL_OUTPUT | grep -P '^[0-9]{3}'`
+
+  if [ ! -z "$isHTTPCode" ] && [ "$CURL_OUTPUT" -ne 200 ]; then
+    echo "${ERROR}: ${ORANGE}HTTP $CURL_OUTPUT${NC} - ${RED}$1${NC}"
+    exit 1
+  fi
+
+  sh -c "$CURL_OUTPUT"
+}
+
 postgres_down() {
   # Stop and remove PostgreSQL container
   $COMPOSE rm -f -s -v $PEERTUBE_DB_HOSTNAME
@@ -192,10 +204,6 @@ stack_down() {
 }
 
 generate_ssl_certificate() {
-<<<<<<< HEAD
-  echo "Generate new SSL/TLS certificate using Let's Encrypt #"
-=======
->>>>>>> 7eed02d... Put SSL certificate message into script
   docker run -it --rm \
   --name certbot \
   -p 80:80 \
@@ -266,79 +274,73 @@ elif [ "$1" = "upgrade" ]; then
     exit 1
   fi
 
-  echo "\n"
-  echo "${ORANGE}WARNING BEFORE ANY UPGRADE${NC}:"
-  echo "- Don't forget to backup $WORKDIR"
-  echo "- Be sure to edit/merge any new configuration files"
-  echo "  See breaking changes here: https://github.com/Chocobozzz/PeerTube/releases"
-  echo "\n"
-  echo "This script will automatically:"
-  echo "- update docker-commpose and current CLI"
-  echo "- down docker stack"
-  echo "- export the database"
-  echo "- pull latest images"
-  echo "- re-import database"
-  echo "- re-generate SSL certificates"
-  echo "- re-up docker stack"
-  echo "\n"
+  cat <<EOF
+/====================================\\
+|     WARNING BEFORE ANY UPGRADE     |
+\\====================================/
 
-  read -p "Continue (y/N)?" CONT
+ Don't forget to backup $WORKDIR
+ Be sure to edit/merge any new configuration files
+ Breaking changes here: https://github.com/Chocobozzz/PeerTube/releases"
 
-  if [ "$CONT" = "y" ]; then
+ This script will automatically:
+
+ → update docker-commpose and current CLI
+ → down docker stack
+ → export the database
+ → pull latest images
+ → re-import database
+ → re-up docker stack
+
+EOF
+
+  read -p "Continue (y/N)? " CONFIRM
+
+  if [ "$CONFIRM" = "y" ]; then
     # Upgrade docker-compose and current CLI
-    echo "Upgrade docker-compose and current CLI #"
-    sh -c "$(curl -f#L $PEERTUBE_DOCKER_RAW_URL/script/index.sh)" >&2
+    curlf "$PEERTUBE_DOCKER_RAW_URL/script/index.sh"
 
     # PeerTube Archive Dump for upgrade
     DB_DUMP=/tmp/peertube-db-dump.tar
 
     # Down all containers to not conflict upgrade
-    echo "Down all containers to not conflict upgrade #"
+    echo "Down all containers to not conflict upgrade \\"
     stack_down
 
     # Dump existing database to easier migrate if any PostgreSQL version upgrade
     # Re-Up PostgreSQL container
-    echo "Re-Up PostgreSQL only #"
+    echo "Re-Up PostgreSQL only \\"
     postgres_up
 
     # Dump existing database
-    echo "Dump PostgreSQL to easier migrate #"
+    echo "Dump PostgreSQL to easier migrate \\"
     postgres_dump $DB_DUMP
 
     # Re-init existing database
     # Remove db files
-    echo -n "Remove PosgreSQL mounted volume ..."
+    echo -n "Remove PosgreSQL mounted volume ... "
     rm -rf ./docker-volume/db
     echo $DONE
 
     # Up postgres service
-    echo "Up PostgreSQL to restore dump #"
+    echo "Up PostgreSQL to restore dump \\"
     postgres_up
 
     # Run restore command
-    echo "Restore PostgreSQL dump #"
+    echo "Restore PostgreSQL dump \\"
     postgres_restore $DB_DUMP
 
     # Clean database archive dump
-    echo -n "Clean PostgreSQL dump ..."
+    echo -n "Clean PostgreSQL dump ... "
     rm -f $DB_DUMP
     echo $DONE
 
-<<<<<<< HEAD
-    # Re-generate SSL/TLS certificate using Let's Encrypt
-    echo "Re-generate SSL/TLS certificate #"
-    generate_ssl_certificate
-
-    # Re-start stack
-    echo "Re-up all containers #"
-=======
     # Pull images
     echo "Pull docker images \\"
     $COMPOSE pull
 
     # Re-up stack
     echo "Re-up docker stack \\"
->>>>>>> 4a65375... Fix: pull manually to avoid error with up + wrong postgres name function
     stack_up
   fi
 
