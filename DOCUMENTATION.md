@@ -7,11 +7,12 @@
 - Check if cURL is installed
 - Check if **Docker >= v17.06** is installed
 - Install or upgrade Compose binary from GitHub Releases
-- Create non-root system user owner of working directory
 - Create or upgrade CLI
 
 The next steps are done only if there is not any PeerTube docker stack already installed:
 
+- Ask domain and email if not defined in environment variables
+- Create non-root system user owner of working directory
 - Create working directory `/var/peertube`
 - Get latest official compose setup of PeerTube stack from GitHub Raw
   - Generate PostgreSQL credentials
@@ -19,8 +20,7 @@ The next steps are done only if there is not any PeerTube docker stack already i
 - Create `peertube.service`
 - Pull latest images
 - Run `peertube.service`
-- Display **PeerTube Admin Credentials** once server up or error logs
-- Display **PeerTube DKIM DNS TXT Record** to configure into your Domain Name System zone
+- Up the stack
 
 ## Use cases
 
@@ -34,6 +34,15 @@ curl https://getpeer.tube | sh
 
 You may want to **auto-fill** environment variables `MY_EMAIL_ADDRESS` and `MY_DOMAIN`:
 
+Step by step:
+```shell
+export MY_EMAIL_ADDRESS=me@domain.tld
+export MY_DOMAIN=domain.tld
+curl https://getpeer.tube -O getpeertube.sh
+sh getpeertube.sh
+```
+
+By one command:
 ```shell
 MY_EMAIL_ADDRESS=me@domain.tld MY_DOMAIN=domain.tld curl https://getpeer.tube | sh
 ```
@@ -42,6 +51,17 @@ You can also download and run [the script](https://raw.github.com/kimsible/getpe
 
 
 ## Extended CLI
+
+### Automatic upgrade
+
+⚠️ **Before any upgrade**<br>
+💡 Don't forget to [backup your peertube docker stack](https://github.com/kimsible/backup-peertube).<br>
+💡 Edit any configuration file one by one if required by the release.<br>
+💡 Check breaking changes here: https://github.com/Chocobozzz/PeerTube/releases
+
+```bash
+$ peertube upgrade
+```
 
 ### Official Server Tools
 
@@ -72,6 +92,11 @@ Before restoration
 $ peertube down
 ```
 
+If you've dumped the database you don't need to copy the db files in the mounted volume :
+```bash
+$ rm -r /var/peertube/docker-volume/db
+```
+
 After restoration
 ```bash
 $ peertube postgres:restore /var/peertube/docker-volume/db.tar
@@ -97,17 +122,6 @@ $ peertube postgres:restore /var/peertube/docker-volume/db.tar
 $ systemctl start peertube
 ```
 
-### Automatic upgrade
-
-⚠️ **Before any upgrade**<br>
-💡 Don't forget to backup your peertube docker stack.<br>
-💡 Edit any configuration file one by one if required by the release.<br>
-💡 Check breaking changes here: https://github.com/Chocobozzz/PeerTube/releases
-
-```bash
-$ peertube upgrade
-```
-
 ### Command List
 
 Simply:
@@ -117,31 +131,10 @@ $ peertube # Will display command list
 
 Or see https://github.com/kimsible/getpeer.tube/blob/master/cli/peertube.
 
-## Development
+### Uninstall
 
-```shell
-GIT_BRANCH=develop curl https://raw.githubusercontent.com/kimsible/getpeer.tube/master/script/index.sh | sh
-```
+Want to uninstall the PeerTube stack and / or the CLI ?
 
-This error occurs if you have already installed peertube in another working directory.
-
-```
-ERROR: Pool overlaps with other one on this address space
-```
-
-To solve that issue you need to stop all old running containers and remove all unsused networks created by these old ones.
-```shell
-docker stop $(docker ps -a -q)
-docker network prune
-```
-
-Magic command to reset all docker containers, images, volumes and networks.
-
-```shell
-docker stop $(docker ps -a -q) & wait; docker rm $(docker ps -a -q) & wait; docker rmi $(docker images -a -q); docker volume rm $(docker volume ls -q) & wait; docker network prune -f
-```
-
-**Uninstall**
 ```shell
 systemctl disable peertube # disabled peertube service
 rm /etc/systemd/system/peertube.service # delete peertube service
@@ -158,3 +151,7 @@ rm /usr/sbin/peertube # remove CLI
 
 rm -r /var/peertube #remove peertube stack
 ```
+
+## Development
+
+See https://github.com/kimsible/getpeer.tube/blob/master/test/README.md
