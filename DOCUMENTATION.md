@@ -26,8 +26,14 @@ The next steps are done only if there is not any PeerTube docker stack already i
 
 ### Basic usage with cURL
 
+Root only:
 ```shell
 curl https://getpeer.tube | sh
+```
+
+With sudo:
+```shell
+sudo sh -c 'curl https://getpeer.tube | sh'
 ```
 
 ### Advanced usage with env vars
