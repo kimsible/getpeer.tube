@@ -39,7 +39,7 @@ Step by step:
 export MY_EMAIL_ADDRESS=me@domain.tld
 export MY_DOMAIN=domain.tld
 curl https://getpeer.tube -o getpeertube.sh
-sh getpeertube.sh
+(sudo) sh getpeertube.sh
 ```
 
 By one command:
