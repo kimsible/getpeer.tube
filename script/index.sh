@@ -422,7 +422,7 @@ echo "${GREEN}The PeerTube docker stack is now successfully installed!${NC}"
 
 cat <<EOF
 
-Get your admin credencials and DKIM DNS TXT Record with:
+Get your admin credentials and DKIM DNS TXT Record with:
 
 EOF
 
