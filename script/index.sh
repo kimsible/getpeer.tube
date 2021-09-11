@@ -73,6 +73,7 @@ get_docker_compose() {
   release=$1
   download_url="https://github.com/docker/compose/releases/download/$release/docker-compose-`uname -s`-`uname -m`"
   curlf "$download_url" "$COMPOSE"
+  chmod +x "$COMPOSE" # asign execution right
 }
 
 # Get latest release name from GitHub api
