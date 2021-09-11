@@ -38,7 +38,7 @@ Step by step:
 ```shell
 export MY_EMAIL_ADDRESS=me@domain.tld
 export MY_DOMAIN=domain.tld
-curl https://getpeer.tube -O getpeertube.sh
+curl https://getpeer.tube -o getpeertube.sh
 sh getpeertube.sh
 ```
 
