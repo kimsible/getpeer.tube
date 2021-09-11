@@ -21,6 +21,21 @@ sh cli/peertube upgrade
 ...
 ```
 
+Certificate
+During testing, the certificate will obviously fail if you don't have the domain name configuered with your IP
+```shell
+Requesting a certificate for mydomain.tld
+
+Certbot failed to authenticate some domains (authenticator: standalone). The Certificate Authority reported these problems:
+  Domain: mydomain.tld
+  Type:   dns
+  Detail: No valid IP addresses found for mydomain.tld
+
+Hint: The Certificate Authority failed to download the challenge files from the temporary standalone webserver started by Certbot on port 80. Ensure that the listed domains point to this machine and that it can accept inbound connections from the internet.
+
+Some challenges have failed
+```
+
 Clean / uninstall
 ```shell
 sh test/clean.sh
