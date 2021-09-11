@@ -401,8 +401,16 @@ echo $DONE
 systemctl >/dev/null 2>&1 daemon-reload # redirect out possible errors
 systemctl enable peertube
 
+# Compose pull
+echo "Pull docker images \\"
+$COMPOSE pull
+
 # Compose Up
+<<<<<<< HEAD
 echo "\nStart PeerTube #"
+=======
+echo "Up docker stack \\"
+>>>>>>> 4a65375... Fix: pull manually to avoid error with up + wrong postgres name function
 $CLI up
 systemctl start --no-block peertube # be sure start process does not block stdout
 

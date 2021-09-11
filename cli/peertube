@@ -243,11 +243,11 @@ elif [ "$1" = "postgres:dump" ]; then
 
 elif [ "$1" = "postgres:restore" ]; then
 
-  posgres_restore $2
+  postgres_restore $2
 
 elif [ "$1" = "postgres:up" ]; then
 
-  posgres_up
+  postgres_up
 
 elif [ "$1" = "up" ]; then
 
@@ -324,12 +324,21 @@ elif [ "$1" = "upgrade" ]; then
     rm -f $DB_DUMP
     echo $DONE
 
+<<<<<<< HEAD
     # Re-generate SSL/TLS certificate using Let's Encrypt
     echo "Re-generate SSL/TLS certificate #"
     generate_ssl_certificate
 
     # Re-start stack
     echo "Re-up all containers #"
+=======
+    # Pull images
+    echo "Pull docker images \\"
+    $COMPOSE pull
+
+    # Re-up stack
+    echo "Re-up docker stack \\"
+>>>>>>> 4a65375... Fix: pull manually to avoid error with up + wrong postgres name function
     stack_up
   fi
 
