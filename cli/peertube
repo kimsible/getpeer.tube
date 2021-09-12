@@ -300,34 +300,41 @@ EOF
     # Upgrade docker-compose and current CLI
     curlf "$PEERTUBE_DOCKER_RAW_URL/script/index.sh"
 
+    # Pull images
+    echo "\nPull peertube docker image \\"
+    $COMPOSE pull peertube
+
+    # Down peertube to not conflict upgrade
+    echo "\nDown peertube to not conflict upgrade \\"
+    $COMPOSE rm -s -f peertube
+
     # PeerTube Archive Dump for upgrade
     DB_DUMP=/tmp/peertube-db-dump.tar
 
-    # Down all containers to not conflict upgrade
-    echo "Down all containers to not conflict upgrade \\"
-    stack_down
-
     # Dump existing database to easier migrate if any PostgreSQL version upgrade
-    # Re-Up PostgreSQL container
-    echo "Re-Up PostgreSQL only \\"
-    postgres_up
-
-    # Dump existing database
-    echo "Dump PostgreSQL to easier migrate \\"
+    echo "\nDump PostgreSQL to easier migrate \\"
     postgres_dump $DB_DUMP
+
+    # Down all containers
+    echo "\nDown all containers \\"
+    stack_down
 
     # Re-init existing database
     # Remove db files
-    echo -n "Remove PosgreSQL mounted volume ... "
+    echo -n "\nRemove PosgreSQL mounted volume ... "
     rm -rf ./docker-volume/db
     echo $DONE
 
-    # Up postgres service
-    echo "Up PostgreSQL to restore dump \\"
+    # Pull images
+    echo "\nPull docker postgres and other \\"
+    $COMPOSE pull
+
+    # Re-Up PostgreSQL container
+    echo "\nRe-Up PostgreSQL only \\"
     postgres_up
 
     # Run restore command
-    echo "Restore PostgreSQL dump \\"
+    echo "\nRestore PostgreSQL dump \\"
     postgres_restore $DB_DUMP
 
     # Clean database archive dump
@@ -335,12 +342,8 @@ EOF
     rm -f $DB_DUMP
     echo $DONE
 
-    # Pull images
-    echo "Pull docker images \\"
-    $COMPOSE pull
-
     # Re-up stack
-    echo "Re-up docker stack \\"
+    echo "\nRe-up docker stack \\"
     stack_up
   fi
 
