@@ -165,7 +165,8 @@ missing_prerequisites=0
 uid=`id -u`
 if [ "$uid" -ne 0 ]; then
   missing_prerequisites=1
-  echo " $ERROR: this script must be run as root or as a sudoer user with sudo"
+  sudo_command="sudo sh -c 'curl https://getpeer.tube | sh'"
+  echo " $ERROR: must be run as root or sudoer user with ${ORANGE}$sudo_command${NC}"
 else
   echo " root $OK"
 fi
