@@ -43,6 +43,7 @@ down
 upgrade
 certbot:init
 postfix:get-dkim-record
+parse-error
 "
 
 # Limit command to Server Tools List
@@ -174,29 +175,7 @@ postgres_up() {
 }
 
 stack_up() {
-   # Run compose detached and exit if any errors
-  compose_errors=`$($COMPOSE up -d) | grep -i 'ERROR'`
-  if [ ! -z "$compose_errors" ]; then
-    exit 1
-  fi
-
-  # Block stdout until server is up
-  sleep 50s &
-  while [ -z "`$COMPOSE logs --tail=2 peertube | grep -o -i -P 'Server listening on'`" ]; do
-    # Break if any stack errors occur
-    # Displays errors and exit
-    stack_errors=`$COMPOSE logs --tail=40 peertube | grep -i 'error'`
-    if [ ! -z "$stack_errors" ]; then
-      echo $stack_errors
-      exit 1
-    fi
-    # Break after 50s / until pid of "sleep 50s" is destroyed
-    # Display logs and exit
-    if [ -z "`ps -ef | grep $! | grep -o -E 'sleep 50s'`" ]; then
-      $COMPOSE logs --tail=40 peertube
-      exit 1
-    fi
-  done
+  $COMPOSE up -d
 }
 
 stack_down() {
@@ -380,6 +359,10 @@ elif [ "$1" = "get-admin-credentials" ]; then
 elif [ "$1" = "certbot:init" ]; then
 
   generate_ssl_certificate
+
+elif [ "$1" = "parse-error" ]; then
+
+  $COMPOSE logs | grep -i error
 
 else
 
