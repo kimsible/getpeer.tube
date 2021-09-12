@@ -131,10 +131,6 @@ get_current_release() {
   echo `$command` |grep -o -E "[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}"
 }
 
-get_env_var() {
-  echo `grep -E -o "^$1=.*" ./.env | sed -E "s/$1=//g"`
-}
-
 validate_domain() {
   echo "$1" |grep -P -i '^[a-z0-9]{1}[a-z0-9.-]*[a-z0-9]{1}\.[a-z]{2}'
 }
