@@ -32,6 +32,7 @@ reset-password
 plugin:install
 plugin:uninstall
 purge-old-account
+get-admin-credentials
 psql
 postgres:down
 postgres:dump
@@ -40,9 +41,8 @@ postgres:up
 up
 down
 upgrade
-show-dkim
-show-admin
-generate-ssl-certificate
+certbot:init
+postfix:get-dkim-record
 "
 
 # Limit command to Server Tools List
@@ -344,11 +344,11 @@ EOF
     stack_up
   fi
 
-elif [ "$1" = "show-dkim" ]; then
+elif [ "$1" = "postfix:get-dkim-record" ]; then
 
   cat ./docker-volume/opendkim/keys/*/*.txt
 
-elif [ "$1" = "show-admin" ]; then
+elif [ "$1" = "get-admin-credentials" ]; then
 
   username=`$COMPOSE logs peertube | grep -A1 -E -o "Username: [0-9a-zAZ-Z]*"`
   password=`$COMPOSE logs peertube | grep -A1 -E -o "User password: [0-9a-zAZ-Z]*"`
@@ -374,7 +374,7 @@ elif [ "$1" = "show-admin" ]; then
     fi
   fi
 
-elif [ "$1" = "generate-ssl-certificate" ]; then
+elif [ "$1" = "certbot:init" ]; then
 
   generate_ssl_certificate
 

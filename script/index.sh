@@ -365,7 +365,7 @@ echo $DONE
 
 # Generate the first SSL certificate using Let's Encrypt
 echo "Generating SSL certificate using Let's Encrypt \\"
-$CLI generate-ssl-certificate
+$CLI certbot:init
 
 # Create / override systemd service
 echo -n "Generating ${ORANGE}$SERVICE_PATH${NC} ... "
@@ -427,8 +427,8 @@ Get your admin credentials and DKIM DNS TXT Record with:
 
 EOF
 
-echo "  ${ORANGE}$ peertube show-admin${NC}"
-echo "  ${ORANGE}$ peertube show-dkim${NC}"
+echo "  ${ORANGE}$ peertube get-admin-credentials${NC}"
+echo "  ${ORANGE}$ peertube postfix:get-dkim-record${NC}"
 
 echo ""
 }
