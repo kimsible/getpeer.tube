@@ -70,20 +70,24 @@ fi
 # Exit if not all prerequisites
 if [ "$missing_prerequisites" -ne 0 ]; then exit 1; fi
 
+get_env() {
+  grep -E -o "^$1=.*" .env | sed -E "s/$1=//g"
+}
+
 # Get postgres user
-POSTGRES_USER="`grep -E -o "^POSTGRES_USER=(.+)" .env | sed -E "s/POSTGRES_USER=//g"`"
+POSTGRES_USER=$(get_env POSTGRES_USER)
 
 # Get postgres db
-POSTGRES_DB="`grep -E -o "^POSTGRES_DB=(.+)" .env | sed -E "s/POSTGRES_DB=//g"`"
+POSTGRES_DB=$(get_env POSTGRES_DB)
 
 # Get postgres service name
-PEERTUBE_DB_HOSTNAME="`grep -E -o "^PEERTUBE_DB_HOSTNAME=(.+)" .env | sed -E "s/PEERTUBE_DB_HOSTNAME=//g"`"
+PEERTUBE_DB_HOSTNAME=$(get_env PEERTUBE_DB_HOSTNAME)
 
 # Get webserver hostname
-PEERTUBE_WEBSERVER_HOSTNAME="`grep -E -o "^PEERTUBE_WEBSERVER_HOSTNAME=(.+)" .env | sed -E "s/PEERTUBE_WEBSERVER_HOSTNAME=//g"`"
+PEERTUBE_WEBSERVER_HOSTNAME=$(get_env PEERTUBE_WEBSERVER_HOSTNAME)
 
 # Get admin email
-PEERTUBE_ADMIN_EMAIL="`grep -E -o "^PEERTUBE_ADMIN_EMAIL=(.+)" .env | sed -E "s/PEERTUBE_ADMIN_EMAIL=//g"`"
+PEERTUBE_ADMIN_EMAIL=$(get_env PEERTUBE_ADMIN_EMAIL)
 
 #################
 ### FUNCTIONS ###
