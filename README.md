@@ -32,11 +32,13 @@ Prerequisites \
  systemd OK
  curl OK
  docker OK
+
 Docker stack already exists in /var/peertube
- → upgrade Compose and CLI only
+
+Upgrading Compose and CLI only \
 Checking latest release of Compose     ... done
-Installing Docker Compose 1.29.2       ... done
- → into /usr/local/bin/docker-compose
+Upgrading Docker Compose               ... done
+ → from 1.28.3 to 1.29.2
 Installing CLI into /usr/sbin/peertube ... done
 
 Docker Compose and the CLI are now successfully upgraded!

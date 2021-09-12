@@ -158,6 +158,7 @@ prompt() {
 ##### MAIN ######
 #################
 
+# Step 1
 echo "Prerequisites \\"
 missing_prerequisites=0
 
@@ -222,8 +223,9 @@ if [ "$missing_prerequisites" -ne 0 ]; then exit 1; fi
 
 # Check if a stack is alreay installed
 if [ -f $WORKDIR/.env ] || [ -f $WORKDIR/docker-compose.yml ] || [ -f $WORKDIR/docker-volume ]; then
-  echo "${ORANGE}Docker stack already exists in $WORKDIR${NC}"
-  echo " → ${GREEN}upgrade Compose and CLI only${NC}"
+  # Step 2
+  echo "\n${ORANGE}Docker stack already exists in $WORKDIR${NC}"
+  echo "\nUpgrading ${GREEN}Compose${NC} and ${GREEN}CLI${NC} only \\"
   UPGRADE=1
 fi
 
@@ -240,8 +242,11 @@ if [ -z "$UPGRADE" ]; then
   fi
 
   # Display used environment variables
-  echo "${ORANGE}Admin email${NC} → using ${GREEN}$MY_EMAIL_ADDRESS${NC}"
-  echo "${ORANGE}Domain name${NC} → using ${GREEN}$MY_DOMAIN${NC}"
+  echo " ${ORANGE}admin email${NC} → using ${GREEN}$MY_EMAIL_ADDRESS${NC}"
+  echo " ${ORANGE}domain name${NC} → using ${GREEN}$MY_DOMAIN${NC}"
+
+  # Step 2
+  echo "\nPreparing environment \\"
 
   # Docker: make sure a non-root docker user system exists
   echo -n "Creating a non-root docker user system ... "
@@ -258,8 +263,7 @@ if [ -z "`uname -a | grep -o "x86_64"`" ]; then
     exit 1
   else
     compose_current_release=`get_current_release "$COMPOSE -v"`
-    echo " ${ORANGE}Found version $compose_current_release${NC}"
-    echo " → ${GREEN}using system docker-compose${NC}"
+    echo " → using system version ${GREEN}$compose_current_release${NC}"
   fi
 else
   # Install or upgrade docker-compose
@@ -280,10 +284,9 @@ else
       echo -n "Upgrading Docker Compose               ... "
       get_docker_compose "$compose_latest_release"
       echo $DONE
-      echo " → from $compose_current_release to $compose_latest_release"
+      echo " → from $compose_current_release to ${GREEN}$compose_latest_release${NC}"
     else
-      echo "${ORANGE}Nothing to update${NC}"
-      echo " → ${GREEN}using docker-compose current version $compose_current_release${NC}"
+      echo " → using current version ${GREEN}$compose_current_release${NC}"
     fi
   fi
 fi
@@ -364,7 +367,7 @@ chown -R docker:docker "$WORKDIR"
 echo $DONE
 
 # Create / override systemd service
-echo -n "Generating ${ORANGE}$SERVICE_PATH${NC} ... "
+echo -n "Generating systemd peertube.service    ... "
 
 cat <<EOT > $SERVICE_PATH
 [Unit]
@@ -389,21 +392,21 @@ EOT
 echo $DONE
 
 # Enable peertube systemd service
-echo -n "Enabling PeerTube systemd service               ... "
+echo -n "Enabling systemd peertube.service      ... "
 systemctl >/dev/null 2>&1 daemon-reload # redirect out possible errors
 systemctl enable peertube
 echo $DONE
 
-# Compose pull
-echo "Pulling docker images \\"
+# Step 3 - Compose pull
+echo "\nPulling docker images \\"
 $COMPOSE pull
 
-# Generate the first SSL certificate using Let's Encrypt
-echo "Generating SSL certificate using Let's Encrypt \\"
+# Step 4 - Generate the first SSL certificate using Let's Encrypt
+echo "\nGenerating SSL certificate using Let's Encrypt \\"
 $CLI certbot:init
 
-# Compose Up
-echo "Up docker stack \\"
+# Step 5 - Compose Up
+echo "\nUp docker stack \\"
 $CLI up
 systemctl start --no-block peertube # be sure start process does not block stdout
 
