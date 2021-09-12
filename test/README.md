@@ -22,18 +22,12 @@ sh cli/peertube upgrade
 ```
 
 Certificate
-During testing, the certificate will obviously fail if you don't have the domain name configuered with your IP
+During testing, the certificate will obviously fail if you don't have the domain name configuered with your IP, so use a `.local` domain **to not fetch letsencrypt servers**.
 ```shell
-Requesting a certificate for mydomain.tld
-
-Certbot failed to authenticate some domains (authenticator: standalone). The Certificate Authority reported these problems:
-  Domain: mydomain.tld
-  Type:   dns
-  Detail: No valid IP addresses found for mydomain.tld
-
-Hint: The Certificate Authority failed to download the challenge files from the temporary standalone webserver started by Certbot on port 80. Ensure that the listed domains point to this machine and that it can accept inbound connections from the internet.
-
-Some challenges have failed
+Requesting a certificate for peertube.local
+An unexpected error occurred:
+The server will not issue certificates for the identifier :: Error creating new order :: Cannot issue for "peertube.local": Domain name does not end with a valid public suffix (TLD)
+Ask for help or search for solutions at https://community.letsencrypt.org. See the logfile /var/log/letsencrypt/letsencrypt.log or re-run Certbot with -v for more details.
 ```
 
 Clean / uninstall
@@ -44,7 +38,9 @@ sh test/clean.sh
 Test a specific branch environment
 
 ```shell
-GIT_BRANCH=develop curl https://raw.githubusercontent.com/kimsible/getpeer.tube/develop/script/index.sh | sh
+export GIT_BRANCH=develop
+curl https://raw.githubusercontent.com/kimsible/getpeer.tube/develop/script/index.sh -o getpt-develop.sh
+sudo sh getpt-develop.sh
 ```
 
 This error occurs if you have already installed peertube in another working directory.
