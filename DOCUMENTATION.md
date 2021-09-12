@@ -33,7 +33,7 @@ curl https://getpeer.tube | sh
 
 With sudo:
 ```shell
-sudo sh -c 'curl https://getpeer.tube | sh'
+curl https://getpeer.tube -o getpt.sh && sudo sh getpt.sh
 ```
 
 ### Advanced usage with env vars
