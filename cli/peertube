@@ -265,7 +265,7 @@ elif [ "$1" = "stack:upgrade" ]; then
 
  Don't forget to backup $WORKDIR
  Be sure to edit/merge any new configuration files
- Breaking changes here: https://github.com/Chocobozzz/PeerTube/releases"
+ Breaking changes here: https://github.com/Chocobozzz/PeerTube/releases
 
  This script will automatically:
 
@@ -305,7 +305,7 @@ EOF
 
     # Re-init existing database
     # Remove db files
-    echo -n "\nRemove PosgreSQL mounted volume ... "
+    echo -n "\nRemove PostgreSQL mounted volume ... "
     rm -rf ./docker-volume/db
     echo $DONE
 
@@ -329,6 +329,9 @@ EOF
     # Re-up stack
     echo "\nRe-up docker stack \\"
     stack_up
+
+    # Upgraded message
+    echo "\n${GREEN}The PeerTube Docker stack has been upgraded!${NC}"
   fi
 
 elif [ "$1" = "postfix:get-dkim-record" ]; then
