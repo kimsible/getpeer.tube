@@ -188,7 +188,7 @@ stack_down() {
 }
 
 generate_ssl_certificate() {
-  docker run -it --rm \
+  docker run --rm \
   --name certbot \
   -p 80:80 \
   -v "$(pwd)/docker-volume/certbot/conf:/etc/letsencrypt" \
