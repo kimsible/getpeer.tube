@@ -66,7 +66,7 @@ You can also download and run [the script](https://raw.github.com/kimsible/getpe
 💡 Check breaking changes here: https://github.com/Chocobozzz/PeerTube/releases
 
 ```bash
-$ peertube upgrade
+$ peertube stack:upgrade
 ```
 
 ### Official Server Tools
@@ -95,7 +95,7 @@ For each restoration you need to down all container with :
 
 Before restoration
 ```bash
-$ peertube down
+$ peertube stack:down
 ```
 
 If you've dumped the database you don't need to copy the db files in the mounted volume :
@@ -106,7 +106,7 @@ $ rm -r /var/peertube/docker-volume/db
 After restoration
 ```bash
 $ peertube postgres:restore /var/peertube/docker-volume/db.tar
-$ peertube up
+$ peertube stack:up
 ```
 
 ### Migration server to server
@@ -115,7 +115,7 @@ On the old server :
 
 ```bash
 $ peertube postgres:dump /var/peertube/docker-volume/db.tar
-$ peertube down
+$ peertube stack:down
 $ rsync -av --exclude docker-volume/db /var/peertube/ username@new-server:/var/peertube/
 ```
 

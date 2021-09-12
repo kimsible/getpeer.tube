@@ -38,12 +38,13 @@ postgres:down
 postgres:dump
 postgres:restore
 postgres:up
-up
-down
-upgrade
+stack:up
+stack:down
+stack:upgrade
+stack:logs
+stack:parse-error
 certbot:init
 postfix:get-dkim-record
-parse-error
 "
 
 # Limit command to Server Tools List
@@ -236,15 +237,15 @@ elif [ "$1" = "postgres:up" ]; then
 
   postgres_up
 
-elif [ "$1" = "up" ]; then
+elif [ "$1" = "stack:up" ]; then
 
   stack_up
 
-elif [ "$1" = "down" ]; then
+elif [ "$1" = "stack:down" ]; then
 
   stack_down
 
-elif [ "$1" = "upgrade" ]; then
+elif [ "$1" = "stack:upgrade" ]; then
 
   # root
   uid=`id -u`
@@ -360,7 +361,11 @@ elif [ "$1" = "certbot:init" ]; then
 
   generate_ssl_certificate
 
-elif [ "$1" = "parse-error" ]; then
+elif [ "$1" = "stack:logs" ]; then
+
+  $COMPOSE logs
+
+elif [ "$1" = "stack:parse-error" ]; then
 
   $COMPOSE logs | grep -i error
 

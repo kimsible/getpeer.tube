@@ -407,7 +407,7 @@ $CLI certbot:init
 
 # Step 5 - Compose Up
 echo "\nUp docker stack \\"
-$CLI up
+$CLI stack:up
 systemctl start --no-block peertube # be sure start process does not block stdout
 
 # Success message
