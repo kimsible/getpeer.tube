@@ -363,10 +363,6 @@ echo -n "Assigning $WORKDIR ownership      ... "
 chown -R docker:docker "$WORKDIR"
 echo $DONE
 
-# Generate the first SSL certificate using Let's Encrypt
-echo "Generating SSL certificate using Let's Encrypt \\"
-$CLI certbot:init
-
 # Create / override systemd service
 echo -n "Generating ${ORANGE}$SERVICE_PATH${NC} ... "
 
@@ -401,6 +397,10 @@ echo $DONE
 # Compose pull
 echo "Pulling docker images \\"
 $COMPOSE pull
+
+# Generate the first SSL certificate using Let's Encrypt
+echo "Generating SSL certificate using Let's Encrypt \\"
+$CLI certbot:init
 
 # Compose Up
 echo "Up docker stack \\"
