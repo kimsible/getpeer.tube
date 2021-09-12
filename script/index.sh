@@ -390,7 +390,7 @@ echo $DONE
 # Enable peertube systemd service
 echo -n "Enabling systemd peertube.service      ... "
 systemctl >/dev/null 2>&1 daemon-reload # redirect out possible errors
-systemctl enable peertube
+systemctl >/dev/null 2>&1 enable peertube
 echo $DONE
 
 # Step 3 - Compose pull
