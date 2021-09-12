@@ -407,7 +407,7 @@ $CLI certbot:init
 
 # Step 5 - Compose Up
 echo "\nUp docker stack \\"
-$CLI up
+$CLI up || echo "\n$ERROR: Sorry, docker stack cannot start. For more details use: ${ORANGE}peertube parse-log${NC}." && exit 1
 systemctl start --no-block peertube # be sure start process does not block stdout
 
 # Success message
