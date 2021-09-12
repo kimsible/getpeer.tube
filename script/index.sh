@@ -166,7 +166,7 @@ missing_prerequisites=0
 uid=`id -u`
 if [ "$uid" -ne 0 ]; then
   missing_prerequisites=1
-  sudo_command="curl https://getpeer.tube -o getpt.sh && sudo sh getpt.sh"
+  sudo_command="curl https://getpeer.tube -o getpt.sh && sudo -E sh getpt.sh"
   echo " $ERROR: must be run as root or sudoer user with ${ORANGE}$sudo_command${NC}"
 else
   echo " root $OK"
