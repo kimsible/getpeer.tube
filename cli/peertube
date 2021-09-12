@@ -182,7 +182,7 @@ stack_up() {
 
   # Block stdout until server is up
   sleep 50s &
-  while [ -z "`$COMPOSE logs --tail=2 peertube | grep -o 'Server listening on'`" ]; do
+  while [ -z "`$COMPOSE logs --tail=2 peertube | grep -o -i -P 'Server listening on'`" ]; do
     # Break if any stack errors occur
     # Displays errors and exit
     stack_errors=`$COMPOSE logs --tail=40 peertube | grep -i 'error'`
