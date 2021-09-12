@@ -204,6 +204,12 @@ stack_down() {
 }
 
 generate_ssl_certificate() {
+  LOCAL_DOMAIN=`echo $PEERTUBE_WEBSERVER_HOSTNAME |grep -P -i '\.local$'`
+
+  if [ ! -z "$LOCAL_DOMAIN" ]; then
+    export USE_LOCAL_CA=1
+  fi
+
   docker run -it --rm \
   --name certbot \
   -p 80:80 \
