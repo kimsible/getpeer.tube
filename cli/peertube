@@ -51,8 +51,8 @@ nginx:reload
 
 # Limit command to Server Tools List
 if [ -z $1 ] || [ -z "`echo $SERVER_TOOLS | grep -o -w $1`" ]; then
-  echo "\nUsage:	peertube SERVER_TOOL\n"
-  echo "Server Tools:\n$SERVER_TOOLS"
+  printf "%b" "\nUsage:	peertube SERVER_TOOL\n\n"
+  printf "%b" "Server Tools:\n$SERVER_TOOLS\n"
   exit 1
 fi
 
@@ -62,11 +62,11 @@ cd $WORKDIR
 missing_prerequisites=0
 
 if [ ! -f .env ]; then
-  echo "$ERROR: Docker-compose ENV VARS `$WORKDIR/docker-volume/.env` not found, can't run `peertube $1`."
+  printf "%b" "$ERROR: Docker-compose ENV VARS `$WORKDIR/docker-volume/.env` not found, can't run `peertube $1`.\n"
 fi
 
 if [ ! -f docker-compose.yml ]; then
-  echo "$ERROR: Docker-compose file `$WORKDIR/docker-volume/docker-compose.yml` not found, can't run `peertube $1`."
+  printf "%b" "$ERROR: Docker-compose file `$WORKDIR/docker-volume/docker-compose.yml` not found, can't run `peertube $1`.\n"
 fi
 
 # Exit if not all prerequisites
@@ -105,7 +105,7 @@ curlf() {
   isHTTPCode=`echo $CURL_OUTPUT | grep -P '^[0-9]{3}'`
 
   if [ ! -z "$isHTTPCode" ] && [ "$CURL_OUTPUT" -ne 200 ]; then
-    echo "${ERROR}: ${ORANGE}HTTP $CURL_OUTPUT${NC} - ${RED}$1${NC}"
+    printf "%b" "${ERROR}: ${ORANGE}HTTP $CURL_OUTPUT${NC} - ${RED}$1${NC}\n"
     exit 1
   fi
 
@@ -119,13 +119,13 @@ postgres_down() {
 
 postgres_dump() {
   if [ -z $1 ]; then
-    echo "Usage:	peertube postgres:dump /PATH/FILENAME.tar"
+    printf "%b" "Usage:	peertube postgres:dump /PATH/FILENAME.tar\n"
     exit 1
   fi
 
   # Do not restore if PostgreSQL container is down
   if [ -z "$($COMPOSE ps -q $PEERTUBE_DB_HOSTNAME)" ]; then
-    echo "$ERROR: PostgreSQL docker container is down, can't dump. First, you must run `peertube postgres:up`"
+    printf "%b" "$ERROR: PostgreSQL docker container is down, can't dump. First, you must run `peertube postgres:up`\n"
     exit 1
   fi
 
@@ -135,20 +135,20 @@ postgres_dump() {
 
 postgres_restore() {
   if [ -z $1 ]; then
-    echo "Usage:	peertube postgres:restore /PATH/FILENAME.tar"
+    printf "%b" "Usage:	peertube postgres:restore /PATH/FILENAME.tar\n"
     exit 1
   fi
 
   missing_prerequisites=0
 
   if [ ! -f "$1" ]; then
-    echo "$ERROR: Database dump archive `$1` not found, can't restore."
+    printf "%b" "$ERROR: Database dump archive `$1` not found, can't restore.\n"
     missing_prerequisites=1
   fi
 
   # Do not restore if PostgreSQL container is down
   if [ -z "$($COMPOSE ps -q $PEERTUBE_DB_HOSTNAME)" ]; then
-    echo "$ERROR: PostgreSQL docker container is down, can't restore. First, you must run `peertube postgres:up`"
+    printf "%b" "$ERROR: PostgreSQL docker container is down, can't restore. First, you must run `peertube postgres:up`\n"
     missing_prerequisites=1
   fi
 
@@ -169,7 +169,7 @@ postgres_up() {
     # Displays errors and exit
     db_errors=`$COMPOSE logs --tail=40 $PEERTUBE_DB_HOSTNAME | grep -i 'error'`
     if [ ! -z "$db_errors" ]; then
-      echo $db_errors
+      printf "%b" "$db_errors\n"
       exit 1
     fi
     # Break after 10s / until pid of "sleep 10s" is destroyed
@@ -211,13 +211,13 @@ if [ "$1" = "purge-old-account" ]; then
 
   username=$2
   if [ -z "$username" ]; then
-    echo "\nUsage:	peertube purge-old-account USERNAME\n"
+    printf "%b" "\nUsage:	peertube purge-old-account USERNAME\n\n"
     exit 1
   fi
 
   count=`$COMPOSE exec -T $PEERTUBE_DB_HOSTNAME psql -t -U $POSTGRES_USER $POSTGRES_DB -c "SELECT count(*) FROM account WHERE name = '$username';" | xargs`
   if [ "$count" -gt 0 ]; then
-    echo "$ERROR: can't purge an existing account"
+    printf "%b" "$ERROR: can't purge an existing account\n"
     exit 1
   fi
 
@@ -264,7 +264,7 @@ elif [ "$1" = "stack:upgrade" ]; then
   # root
   uid=`id -u`
   if [ "$uid" -ne 0 ]; then
-    echo "$ERROR: this script must be run as root or as a sudoer user with sudo"
+    printf "%b" "$ERROR: this script must be run as root or as a sudoer user with sudo\n"
     exit 1
   fi
 
@@ -294,62 +294,63 @@ EOF
 
   if [ "$CONFIRM" = "y" ]; then
     # Upgrade docker-compose and current CLI
+    printf "\n"
     curlf "$PEERTUBE_DOCKER_RAW_URL/script/index.sh"
 
     # Pull images
-    echo "\nPull docker images \\"
+    printf "%b" "\nPull docker images \ \n"
     $COMPOSE pull
 
     # Down peertube to not conflict upgrade
-    echo "\nDown peertube to not conflict upgrade \\"
+    printf "%b" "\nDown peertube to not conflict upgrade \ \n"
     $COMPOSE rm -s -f peertube
 
     # PeerTube Archive Dump for upgrade
     DB_DUMP=/tmp/peertube-db-dump.tar
 
     # Dump existing database to easier migrate if any PostgreSQL version upgrade
-    echo "\nDump PostgreSQL to easier migrate \\"
+    printf "%b" "\nDump PostgreSQL to easier migrate \ \n"
     postgres_dump $DB_DUMP
 
     # Down all containers
-    echo "\nDown all containers but nginx \\"
+    printf "%b" "\nDown all containers but nginx \ \n"
     stack_down
 
     # Re-init existing database
     # Remove db files
-    echo -n "\nRemove PostgreSQL mounted volume ... "
+    printf "%b" "\nRemove PostgreSQL mounted volume ... "
     rm -rf ./docker-volume/db
-    echo $DONE
+    printf "%b" "$DONE\n"
 
     # Re-Up PostgreSQL container
-    echo "\nRe-Up PostgreSQL only \\"
+    printf "%b" "\nRe-Up PostgreSQL only \ \n"
     postgres_up
 
     # Run restore command
-    echo "\nRestore PostgreSQL dump \\"
+    printf "%b" "\nRestore PostgreSQL dump \ \n"
     postgres_restore $DB_DUMP
 
     # Clean database archive dump
-    echo -n "Clean PostgreSQL dump ... "
+    printf "%b" "Clean PostgreSQL dump ... "
     rm -f $DB_DUMP
-    echo $DONE
+    printf "%b" "$DONE\n"
 
     # Re-up stack
-    echo "\nRe-up docker stack \\"
+    printf "%b" "\nRe-up docker stack \ \n"
     stack_up
 
     # Check nginx config
-    echo "\nCheck nginx config \\"
+    printf "%b" "\nCheck nginx config \ \n"
     $COMPOSE exec webserver nginx -t
-    echo $DONE
+    printf "%b" "$DONE\n"
 
     # Reload nginx
-    echo "\nReload nginx \\"
+    printf "%b" "\nReload nginx \ \n"
     $COMPOSE exec webserver nginx -s reload
-    echo $DONE
+    printf "%b" "$DONE\n"
 
     # Upgraded message
-    echo "\n${GREEN}The PeerTube Docker stack has been upgraded!${NC}"
+    printf "%b" "\n${GREEN}The PeerTube Docker stack has been upgraded!${NC}\n\n"
   fi
 
 elif [ "$1" = "postfix:get-dkim-record" ]; then
@@ -366,7 +367,7 @@ elif [ "$1" = "get-admin-credentials" ]; then
     echo $password
   else # If credentials are not found in compose logs
     if [ ! -f docker-volume/data/logs/peertube.log ]; then
-      echo "$ERROR: Can't display Admin Credentials, missing docker-volume/data/logs/peertube.log"
+      printf "%b" "$ERROR: Can't display Admin Credentials, missing docker-volume/data/logs/peertube.log\n"
       exit 1
     else
       username=`cat docker-volume/data/logs/peertube.log | grep -A1 -E -o "Username: [0-9a-zAZ-Z]*"`
@@ -376,7 +377,7 @@ elif [ "$1" = "get-admin-credentials" ]; then
         echo $username
         echo $password
       else
-        echo "$ERROR: Missing Admin Credentials in logs"
+        printf "%b" "$ERROR: Missing Admin Credentials in logs\n"
         exit 1
       fi
     fi

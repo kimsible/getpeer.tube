@@ -140,11 +140,11 @@ validate_email() {
 }
 
 prompt() {
-  read -p " What is your $1? " INPUT
+  read -p "What is your $1? " INPUT
 
   while [ -z "`validate_$1 $INPUT`" ]; do
-    printf "%b" " ${ERROR}: ${ORANGE}$INPUT${NC} is not a valid $1, please enter a valid one\n" >&2 # prompt error after failed
-    read -p " What is your $1? " INPUT
+    printf "%b" "${ERROR}: ${ORANGE}$INPUT${NC} is not a valid $1, please enter a valid one\n" >&2 # prompt error after failed
+    read -p "What is your $1? " INPUT
   done
 
   echo $INPUT
@@ -220,8 +220,8 @@ if [ "$missing_prerequisites" -ne 0 ]; then exit 1; fi
 # Check if a stack is alreay installed
 if [ -f $WORKDIR/.env ] || [ -f $WORKDIR/docker-compose.yml ] || [ -f $WORKDIR/docker-volume ]; then
   # Step 2
-  printf "%b" "\n${ORANGE}Docker stack already exists in $WORKDIR${NC}\n\n"
-  printf "%b" "\nUpgrading ${GREEN}Compose${NC} and ${GREEN}CLI${NC} only \ \n"
+  printf "%b" "\n${ORANGE}Docker stack already exists in $WORKDIR${NC}\n"
+  printf "%b" "\nUpgrading ${GREEN}Compose${NC} and ${GREEN}CLI${NC} only\ \n"
   UPGRADE=1
 fi
 
@@ -242,7 +242,7 @@ if [ -z "$UPGRADE" ]; then
   printf "%b" " ${ORANGE}domain name${NC} → using ${GREEN}$MY_DOMAIN${NC}\n"
 
   # Step 2
-  printf "%b" "\nPreparing environment \ \n"
+  printf "%b" "\nPreparing environment\ \n"
 
   # Docker: make sure a non-root docker user system exists
   printf "%b" "Creating a non-root docker user system ... "
@@ -296,7 +296,7 @@ printf "%b" "$DONE\n"
 
 # Stop here if upgrading docker-compose / CLI
 if [ ! -z "$UPGRADE" ]; then
-  printf "%b" "\n${GREEN}Docker Compose and the CLI are now successfully upgraded!${NC}\n\n"
+  printf "%b" "\n${GREEN}Docker Compose and the CLI are now successfully upgraded!${NC}\n"
   exit 1
 fi
 
@@ -394,15 +394,15 @@ systemctl >/dev/null 2>&1 enable peertube
 printf "%b" "$DONE\n"
 
 # Step 3 - Compose pull
-printf "%b" "\nPulling docker images \ \n"
+printf "%b" "\nPulling docker images\ \n"
 $COMPOSE pull
 
 # Step 4 - Generate the first SSL certificate using Let's Encrypt
-printf "%b" "\nGenerating SSL certificate using Let's Encrypt \ \n"
+printf "%b" "\nGenerating SSL certificate using Let's Encrypt \n"
 $CLI certbot:init
 
 # Step 5 - Compose Up
-printf "%b" "\nUp docker stack \ \n"
+printf "%b" "\nUp docker stack\ \n"
 $CLI stack:up
 systemctl start --no-block peertube # be sure start process does not block stdout
 
