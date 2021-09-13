@@ -45,6 +45,8 @@ stack:logs
 stack:parse-error
 certbot:init
 postfix:get-dkim-record
+nginx:check-config
+nginx:reload
 "
 
 # Limit command to Server Tools List
@@ -184,7 +186,11 @@ stack_up() {
 }
 
 stack_down() {
-  $COMPOSE down -v --remove-orphans
+  if [ -z "$1" ]; then
+    $COMPOSE rm -s -f $($COMPOSE ps -a --services | sed -E 's/webserver//g')
+  else
+    $COMPOSE down -v --remove-orphans
+  fi
 }
 
 generate_ssl_certificate() {
@@ -247,7 +253,11 @@ elif [ "$1" = "stack:up" ]; then
 
 elif [ "$1" = "stack:down" ]; then
 
-  stack_down
+  if [ "$2" = "--force" ]; then
+    stack_down 1
+  else
+    stack_down
+  fi
 
 elif [ "$1" = "stack:upgrade" ]; then
 
@@ -270,10 +280,11 @@ elif [ "$1" = "stack:upgrade" ]; then
  This script will automatically:
 
  → update docker-commpose and current CLI
- → down docker stack
+ → down docker stack but nginx
  → export the database
  → pull latest images
  → re-import database
+ → check nginx config and reload on-the-fly
  → re-up docker stack
 
 EOF
@@ -300,7 +311,7 @@ EOF
     postgres_dump $DB_DUMP
 
     # Down all containers
-    echo "\nDown all containers \\"
+    echo "\nDown all containers but nginx \\"
     stack_down
 
     # Re-init existing database
@@ -329,6 +340,16 @@ EOF
     # Re-up stack
     echo "\nRe-up docker stack \\"
     stack_up
+
+    # Check nginx config
+    echo "\nCheck nginx config \\"
+    $COMPOSE exec webserver nginx -t
+    echo $DONE
+
+    # Reload nginx
+    echo "\nReload nginx \\"
+    $COMPOSE exec webserver nginx -s reload
+    echo $DONE
 
     # Upgraded message
     echo "\n${GREEN}The PeerTube Docker stack has been upgraded!${NC}"
@@ -375,6 +396,14 @@ elif [ "$1" = "stack:logs" ]; then
 elif [ "$1" = "stack:parse-error" ]; then
 
   $COMPOSE logs | grep -i error
+
+elif [ "$1" = "nginx:check-config" ]; then
+
+  $COMPOSE exec webserver nginx -t
+
+elif [ "$1" = "nginx:reload" ]; then
+
+  $COMPOSE exec webserver nginx -s reload
 
 else
 
