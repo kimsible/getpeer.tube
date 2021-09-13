@@ -280,12 +280,13 @@ elif [ "$1" = "stack:upgrade" ]; then
  This script will automatically:
 
  → update docker-commpose and current CLI
+ → pull latest images
  → down docker stack but nginx
  → export the database
- → pull latest images
+ → re-create the database container
  → re-import database
- → check nginx config and reload on-the-fly
  → re-up docker stack
+ → check nginx config and reload on-the-fly
 
 EOF
 
