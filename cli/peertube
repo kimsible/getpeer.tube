@@ -296,8 +296,8 @@ EOF
     curlf "$PEERTUBE_DOCKER_RAW_URL/script/index.sh"
 
     # Pull images
-    echo "\nPull peertube docker image \\"
-    $COMPOSE pull peertube
+    echo "\nPull docker images \\"
+    $COMPOSE pull
 
     # Down peertube to not conflict upgrade
     echo "\nDown peertube to not conflict upgrade \\"
@@ -319,10 +319,6 @@ EOF
     echo -n "\nRemove PostgreSQL mounted volume ... "
     rm -rf ./docker-volume/db
     echo $DONE
-
-    # Pull images
-    echo "\nPull docker postgres and other \\"
-    $COMPOSE pull
 
     # Re-Up PostgreSQL container
     echo "\nRe-Up PostgreSQL only \\"
