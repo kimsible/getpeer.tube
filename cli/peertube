@@ -309,8 +309,9 @@ EOF
     DB_DUMP=/tmp/peertube-db-dump.tar
 
     # Dump existing database to easier migrate if any PostgreSQL version upgrade
-    printf "%b" "\nDump PostgreSQL to easier migrate \ \n"
+    printf "%b" "\nDump PostgreSQL to easier migrate ... "
     postgres_dump $DB_DUMP
+    printf "%b" "$DONE\n"
 
     # Down all containers
     printf "%b" "\nDown all containers but nginx \ \n"
@@ -327,8 +328,9 @@ EOF
     postgres_up
 
     # Run restore command
-    printf "%b" "\nRestore PostgreSQL dump \ \n"
+    printf "%b" "\nRestore PostgreSQL dump ... "
     postgres_restore $DB_DUMP
+    printf "%b" "$DONE\n"
 
     # Clean database archive dump
     printf "%b" "Clean PostgreSQL dump ... "
@@ -342,12 +344,10 @@ EOF
     # Check nginx config
     printf "%b" "\nCheck nginx config \ \n"
     $COMPOSE exec webserver nginx -t
-    printf "%b" "$DONE\n"
 
     # Reload nginx
     printf "%b" "\nReload nginx \ \n"
     $COMPOSE exec webserver nginx -s reload
-    printf "%b" "$DONE\n"
 
     # Upgraded message
     printf "%b" "\n${GREEN}The PeerTube Docker stack has been upgraded!${NC}\n\n"

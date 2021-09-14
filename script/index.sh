@@ -220,7 +220,7 @@ if [ "$missing_prerequisites" -ne 0 ]; then exit 1; fi
 # Check if a stack is alreay installed
 if [ -f $WORKDIR/.env ] || [ -f $WORKDIR/docker-compose.yml ] || [ -f $WORKDIR/docker-volume ]; then
   # Step 2
-  printf "%b" "\n${ORANGE}Docker stack already exists in $WORKDIR${NC}\n\n"
+  printf "%b" "\n${ORANGE}Docker stack already exists in $WORKDIR${NC}\n"
   printf "%b" "\nUpgrading ${GREEN}Compose${NC} and ${GREEN}CLI${NC} only \ \n"
   UPGRADE=1
 fi
