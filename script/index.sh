@@ -136,7 +136,7 @@ validate_domain() {
 }
 
 validate_email() {
-  echo "$1" |grep -P -i '^[a-z0-9]+@[a-z0-9]+\.[a-z]{2}'
+  echo "$1" |grep -P -i '^[a-z0-9]{1}[a-z0-9-_.]*[a-z0-9]{1}@[a-z0-9]{1}[a-z0-9.-]*[a-z0-9]{1}\.[a-z]{2}'
 }
 
 prompt() {
