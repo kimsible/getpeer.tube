@@ -187,7 +187,7 @@ stack_up() {
 
 stack_down() {
   if [ -z "$1" ]; then
-    $COMPOSE rm -s -f $($COMPOSE ps -a --services | sed -E 's/webserver//g')
+    $COMPOSE rm -s -v -f $($COMPOSE ps -a --services | sed -E 's/webserver//g')
   else
     $COMPOSE down -v --remove-orphans
   fi
@@ -303,7 +303,7 @@ EOF
 
     # Down peertube to not conflict upgrade
     printf "%b" "\nDown peertube to not conflict upgrade \ \n"
-    $COMPOSE rm -s -f peertube
+    $COMPOSE rm -s -f -v peertube
 
     # PeerTube Archive Dump for upgrade
     DB_DUMP=/tmp/peertube-db-dump.tar
