@@ -156,7 +156,7 @@ postgres_restore() {
   if [ "$missing_prerequisites" -ne 0 ]; then exit 1; fi
 
   # Run restore command
-  $COMPOSE exec $PEERTUBE_DB_HOSTNAME pg_restore -U $POSTGRES_USER -d $POSTGRES_DB < $1
+  docker exec -i -t $(docker inspect -f '{{.Name}}' $($COMPOSE ps -q postgres) | cut -c2-) pg_restore -U $POSTGRES_USER -d $POSTGRES_DB < $1
 }
 
 postgres_up() {
